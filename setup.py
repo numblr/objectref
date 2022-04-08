@@ -21,5 +21,6 @@ setup(
     long_description_content_type="text/markdown",
     python_requires='>=3.7',
     install_requires=['cltl.combot', 'cltl.backend', 'emissor',
-                      'cltl.brain', 'cltl.triple_extraction', 'cltl.reply_generation'],
+                      'cltl.brain', 'cltl.triple_extraction', 'cltl.reply_generation',
+                      'jsonpickle'],
 )
