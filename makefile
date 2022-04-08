@@ -1,6 +1,13 @@
 SHELL = /bin/bash
 
-project_dependencies ?= $(addprefix $(project_root)/, emissor cltl-requirements)
+project_dependencies ?= $(addprefix $(project_root)/, \
+		emissor \
+		cltl-combot \
+		cltl-requirements \
+		cltl-knowledgerepresentation \
+		cltl-knowledgeextraction \
+		cltl-languagegeneration)
+
 
 git_remote ?= https://github.com/leolani
 

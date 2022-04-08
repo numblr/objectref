@@ -1,8 +1,0 @@
-ASK {
-    VALUES (?r) { (<%s>) }
-        { ?r ?p ?o }
-        UNION
-        { ?s ?r ?o }
-        UNION
-        { ?s ?p ?r }
-    }
