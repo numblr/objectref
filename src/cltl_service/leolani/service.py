@@ -76,9 +76,11 @@ class LeolaniService:
             textSignal = TextSignal.for_scenario(self._scenario.id, 0, 0, None, event.payload.signal.text)
             emissor_api.add_speaker_annotation(textSignal, self.HUMAN_ID)
 
-            reply_textSignal = talk.understand_remember_reply(self._scenario, textSignal, self.chat, replier, analyzer, self.AGENT,
-                                                              self.HUMAN_ID,
-                                                              self.brain, None, None, logger)
+            reply_textSignal = talk.understand_remember_reply(self._scenario, textSignal, self.chat, replier, analyzer,
+                                                              self.AGENT, self.HUMAN_ID,
+                                                              self.brain,
+                                                              self._scenario.context.location, self._scenario.context.location_id,
+                                                              logger)
 
             emissor_api.add_speaker_annotation(reply_textSignal, self.AGENT)
             modifiedPayload = TextSignalEvent.create(reply_textSignal)
