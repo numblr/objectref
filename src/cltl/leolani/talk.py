@@ -1,9 +1,9 @@
 from random import choice
 import pprint
 
+from cltl.brain.commons.discrete import UtteranceType
 from cltl.brain.long_term_memory import LongTermMemory
 from cltl.brain.utils.helper_functions import brain_response_to_json
-#from cltl.combot.backend.api.discrete import UtteranceType
 from cltl.reply_generation.lenka_replier import LenkaReplier
 from cltl.reply_generation.data.sentences import GREETING, ASK_NAME, ELOQUENCE, TALK_TO_ME
 
@@ -15,7 +15,7 @@ import cltl.leolani.capsule_util as c_util
 import cltl.leolani.text_util as t_util
 
 
-def add_mention_to_episodic_memory(textSignal: TextSignal, source, mention_list, my_brain, scenario_ctrl, location,
+def add_mention_to_episodic_memory(textSignal: TextSignal, source, mention_list, my_brain, scenario, location,
                                       place_id):
     response_list = []
     for mention in mention_list:
@@ -23,7 +23,7 @@ def add_mention_to_episodic_memory(textSignal: TextSignal, source, mention_list,
         ### We created a perceivedBy triple for this experience,
         ### @TODO we need to include the bouding box somehow in the object
         #print(mention)
-        capsule = c_util.scenario_image_triple_to_capsule(scenario_ctrl,
+        capsule = c_util.scenario_image_triple_to_capsule(scenario,
                                                           textSignal,
                                                           location,
                                                           place_id,
@@ -50,7 +50,7 @@ def get_subj_obj_labels_from_capsules(capsule_list):
     mentions = list(set(mentions))
     return mentions
 
-def understand_and_remember(scenario_ctrl,
+def understand_and_remember(scenario,
                         AGENT,
                         HUMAN_NAME,
                         HUMAN_ID,
@@ -64,8 +64,7 @@ def understand_and_remember(scenario_ctrl,
     #### Initial prompt by the system from which we create a TextSignal and store it
     initial_prompt = f"{choice(TALK_TO_ME)}"
     print(AGENT + ": " + initial_prompt)
-    textSignal = d_util.create_text_signal(scenario_ctrl, initial_prompt)
-    scenario_ctrl.append_signal(textSignal)
+    textSignal = d_util.create_text_signal(scenario, initial_prompt)
 
     utterance = ""
     #### Get input and loop
@@ -73,12 +72,11 @@ def understand_and_remember(scenario_ctrl,
         ###### Getting the next input signals
         utterance = input('\n')
         print(HUMAN_NAME + ": " + utterance)
-        textSignal = d_util.create_text_signal(scenario_ctrl, utterance)
-        scenario_ctrl.append_signal(textSignal)
+        textSignal = d_util.create_text_signal(scenario, utterance)
 
         #### Process input and generate reply
 
-        capsule_list, reply_list, response_list = process_statement_and_reply(scenario_ctrl,
+        capsule_list, reply_list, response_list = process_statement_and_reply(scenario,
                                                      place_id,
                                                      location,
                                                      HUMAN_ID,
@@ -93,14 +91,13 @@ def understand_and_remember(scenario_ctrl,
         for a_reply in reply_list:
             reply+= a_reply+". "
         print(AGENT + ": " + reply)
-        textSignal = d_util.create_text_signal(scenario_ctrl, reply)
-        scenario_ctrl.append_signal(textSignal)
+        textSignal = d_util.create_text_signal(scenario, reply)
 
         ###### Add denotedIn links for every subject and object label
         mention_list = get_subj_obj_labels_from_capsules(capsule_list)
-        add_mention_to_episodic_memory(textSignal, HUMAN_ID, mention_list, my_brain, scenario_ctrl, location, place_id)
+        add_mention_to_episodic_memory(textSignal, HUMAN_ID, mention_list, my_brain, scenario, location, place_id)
 
-def understand_remember_reply(scenario_ctrl, textSignal, chat, replier, analyzer,
+def understand_remember_reply(scenario, textSignal, chat, replier, analyzer,
                         AGENT,
                         HUMAN_ID,
                         my_brain,
@@ -109,7 +106,7 @@ def understand_remember_reply(scenario_ctrl, textSignal, chat, replier, analyzer
                         logger):
     #### Process input and generate reply
 
-    capsule_list, reply_list, response_list = process_statement_reply_with_brain(scenario_ctrl,
+    capsule_list, reply_list, response_list = process_statement_reply_with_brain(scenario,
                                                  place_id,
                                                  location,
                                                  HUMAN_ID,
@@ -125,18 +122,17 @@ def understand_remember_reply(scenario_ctrl, textSignal, chat, replier, analyzer
     ###### Add denotedIn links for every subject and object label
 
     mention_list = get_subj_obj_labels_from_capsules(capsule_list)
-    add_mention_to_episodic_memory(textSignal, HUMAN_ID, mention_list, my_brain, scenario_ctrl, location, place_id)
+    add_mention_to_episodic_memory(textSignal, HUMAN_ID, mention_list, my_brain, scenario, location, place_id)
 
     reply = ""
     for a_reply in reply_list:
         reply+= a_reply+". "
-    reply_textSignal = d_util.create_text_signal(scenario_ctrl, reply)
-    scenario_ctrl.append_signal(reply_textSignal)
+    reply_textSignal = d_util.create_text_signal(scenario, reply)
 
     return reply_textSignal
 
 
-def understand_and_remember_loop(scenario_ctrl, textSignal,
+def understand_and_remember_loop(scenario, textSignal,
                         AGENT,
                         HUMAN_NAME,
                         HUMAN_ID,
@@ -149,7 +145,7 @@ def understand_and_remember_loop(scenario_ctrl, textSignal,
     chat = Chat(HUMAN_ID)
     #### Process input and generate reply
 
-    capsule_list, reply_list, response_list = process_statement_and_reply(scenario_ctrl,
+    capsule_list, reply_list, response_list = process_statement_and_reply(scenario,
                                                  place_id,
                                                  location,
                                                  HUMAN_ID,
@@ -164,14 +160,13 @@ def understand_and_remember_loop(scenario_ctrl, textSignal,
     for a_reply in reply_list:
         reply+= a_reply+". "
     #print(AGENT + ": " + reply)
-    textSignal = d_util.create_text_signal(scenario_ctrl, reply)
-    scenario_ctrl.append_signal(textSignal)
+    textSignal = d_util.create_text_signal(scenario, reply)
 
     ###### Add denotedIn links for every subject and object label
     mention_list = get_subj_obj_labels_from_capsules(capsule_list)
-    add_mention_to_episodic_memory(textSignal, HUMAN_ID, mention_list, my_brain, scenario_ctrl, location, place_id)
+    add_mention_to_episodic_memory(textSignal, HUMAN_ID, mention_list, my_brain, scenario, location, place_id)
 
-def understand(scenario_ctrl, textSignal, chat, analyzer,
+def understand(scenario, textSignal, chat, analyzer,
                         AGENT,
                         HUMAN_ID,
                       location,
@@ -179,7 +174,7 @@ def understand(scenario_ctrl, textSignal, chat, analyzer,
     print_details = False
     #### Process input and generate reply
 
-    capsule_list, reply_list = process_statement_and_reply(scenario_ctrl,
+    capsule_list, reply_list = process_statement_and_reply(scenario,
                                                  place_id,
                                                  location,
                                                  HUMAN_ID,
@@ -192,8 +187,7 @@ def understand(scenario_ctrl, textSignal, chat, analyzer,
     for a_reply in reply_list:
         reply+= a_reply+". "
     print(AGENT + ": " + reply)
-    textSignal = d_util.create_text_signal(scenario_ctrl, reply)
-    scenario_ctrl.append_signal(textSignal)
+    textSignal = d_util.create_text_signal(scenario, reply)
 
     return textSignal
 
@@ -308,9 +302,9 @@ def process_text_and_reply(scenario: Scenario,
     else:
         for extracted_triple in chat.last_utterance.triples:
             print(extracted_triple)
-            capsule = c_util.scenario_utterance_to_capsule(scenario,place_id,location, textSignal,human_id, extracted_triple)
+            capsule = c_util.scenario_utterance_to_capsule(scenario, place_id, location, textSignal,human_id, extracted_triple)
 
-            if chat.last_utterance.utterance_type == UtteranceType.QUESTION:
+            if chat.last_utterance.utterance_type.name == UtteranceType.QUESTION.name:
                 capsule = c_util.lowcase_triple_json_for_query(capsule)
                 try:
                     response = my_brain.query_brain(capsule)
@@ -320,7 +314,7 @@ def process_text_and_reply(scenario: Scenario,
                     reply_list.append(reply)
                 except:
                     print('Error:', response)
-            elif chat.last_utterance.utterance_type == UtteranceType.STATEMENT:
+            elif chat.last_utterance.utterance_type.name == UtteranceType.STATEMENT.name:
                 try:
                     response = my_brain.update(capsule, reason_types=True, create_label=True)
                     response_json = brain_response_to_json(response)

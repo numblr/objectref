@@ -82,7 +82,7 @@ def start_a_scenario (AGENT:str, HUMAN_ID:str, HUMAN_NAME: str, root_dir:str):
         sys.path.append(scenario_path)
 
     if not os.path.exists(scenario_path):
-        os.mkdir(scenario_path)
+        os.makedirs(scenario_path)
         print("Created a data folder for storing the scenarios", scenario_path)
 
     ### Specify the path to an existing folder with the embeddings of your friends
