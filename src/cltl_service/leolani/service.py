@@ -25,9 +25,10 @@ class LeolaniService:
     def from_config(cls, event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
         config = config_manager.get_config("cltl.leolani")
 
-        return cls(config.get("topic_scenario"), config.get("topic_input"), config.get("topic_output"), event_bus, resource_manager)
+        return cls(config.get("topic_scenario"), config.get("topic_input"), config.get("topic_output"),
+                   config.get("brain_log"), event_bus, resource_manager)
 
-    def __init__(self, scenario_topic: str, input_topic: str, output_topic: str,
+    def __init__(self, scenario_topic: str, input_topic: str, output_topic: str, log_path: str,
                  event_bus: EventBus, resource_manager: ResourceManager):
         self._event_bus = event_bus
         self._resource_manager = resource_manager
@@ -43,8 +44,7 @@ class LeolaniService:
         self.HUMAN_ID = "Piek"
         self.chat = Chat(self.HUMAN_ID)
         # Initialise the brain in GraphDB
-        log_path = pathlib.Path("")
-        self.brain = LongTermMemory(address="http://localhost:7200/repositories/sandbox", log_dir=log_path,
+        self.brain = LongTermMemory(address="http://localhost:7200/repositories/sandbox", log_dir=pathlib.Path(log_path),
                                   clear_all=True)
         self._scenario = None
 
