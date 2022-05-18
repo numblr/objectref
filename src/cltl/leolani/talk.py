@@ -1,11 +1,11 @@
 from random import choice
 import pprint
 
-from cltl.brain.commons.discrete import UtteranceType
+from cltl.commons.discrete import UtteranceType
 from cltl.brain.long_term_memory import LongTermMemory
 from cltl.brain.utils.helper_functions import brain_response_to_json
 from cltl.reply_generation.lenka_replier import LenkaReplier
-from cltl.reply_generation.data.sentences import GREETING, ASK_NAME, ELOQUENCE, TALK_TO_ME
+from cltl.commons.language_data.sentences import GREETING, ASK_NAME, ELOQUENCE, TALK_TO_ME
 
 from cltl.triple_extraction.api import Chat
 from emissor.representation.scenario import TextSignal, Scenario
