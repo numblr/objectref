@@ -5,7 +5,7 @@ from datetime import datetime
 
 import requests
 from cltl.brain import LongTermMemory
-from cltl.combot.event.bdi import IntentionEvent
+from cltl.combot.event.bdi import IntentionEvent, DesireEvent
 from cltl.combot.event.emissor import LeolaniContext, ScenarioStarted, ScenarioStopped
 from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
@@ -67,8 +67,6 @@ class ContextService:
                                          name=self.__class__.__name__)
         self._topic_worker.start().wait()
 
-        self._event_bus.publish(self._intention_topic, Event.for_payload(IntentionEvent("init")))
-
     def stop(self):
         if not self._topic_worker:
             pass
@@ -79,10 +77,14 @@ class ContextService:
 
     def _process(self, event: Event):
         if event.metadata.topic == self._intention_topic:
-            if "init" in event.payload.intentions:
+            intentions = event.payload.intentions
+            if "init" in intentions:
                 self._start_scenario()
+            if "terminate" in intentions:
+                self._stop_scenario()
         elif event.metadata.topic == self._desire_topic:
-            if "quit" in event.payload.achieved:
+            achieved = event.payload.achieved
+            if "quit" in achieved:
                 self._stop_scenario()
 
     def _start_scenario(self):
