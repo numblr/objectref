@@ -14,6 +14,9 @@ from emissor.representation.scenario import TextSignal
 logger = logging.getLogger(__name__)
 
 
+TIMEOUT = 30_000
+
+
 class InitService:
     @classmethod
     def from_config(cls, emissor_client: EmissorDataClient,
@@ -69,14 +72,20 @@ class InitService:
         self._topic_worker = None
 
     def _process(self, event: Event):
+        timestamp = timestamp_now()
         if self._face_or_keyword(event) and not self._timeout:
             self._event_bus.publish(self._text_out_topic, Event.for_payload(self._greeting_payload()))
-            self._timeout = timestamp_now()
-        elif self._timeout and timestamp_now() - self._timeout < 10_000 and self._start_utterance(event):
+            self._timeout = timestamp
+            logger.info("Start initialization")
+        elif self._timeout and timestamp - self._timeout < TIMEOUT and self._start_utterance(event):
             self._timeout = None
             self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(["initialized"])))
-        elif self._timeout:
+            logger.info("Interaction initialized")
+        elif self._timeout and timestamp - self._timeout > TIMEOUT:
             self._timeout = None
+            logger.info("Reset initialization")
+
+        logger.debug("Unhandled event %s (%s - %s)", event, timestamp, self._timeout)
 
     def _start_utterance(self, event):
         return event.metadata.topic == self._text_in_topic and "start" in event.payload.signal.text.lower()
