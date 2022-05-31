@@ -20,7 +20,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     python_requires='>=3.7',
-    install_requires=['cltl.combot', 'cltl.backend', 'emissor',
+    install_requires=['cltl.combot', 'cltl.emissor-data',
                       'cltl.brain', 'cltl.triple_extraction', 'cltl.reply_generation',
-                      'jsonpickle'],
+                      'emissor', 'jsonpickle'],
 )
