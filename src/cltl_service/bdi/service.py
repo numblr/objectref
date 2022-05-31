@@ -51,7 +51,9 @@ class BDIService:
         self._intentions = []
 
         self._bdi = {"init":
-                         {"initialized": ["chat"]},
+                         {"initialized": ["g2ky"]},
+                     "g2ky":
+                         {"resolved": ["chat"]},
                      "chat":
                          {"quit": ["init"]}
                      }
