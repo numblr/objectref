@@ -1,6 +1,9 @@
 import logging
+import random
+import re
 from typing import Mapping
 
+from cltl.commons.language_data.sentences import GREETING, GOODBYE
 from cltl.combot.event.bdi import DesireEvent
 from cltl.combot.event.emissor import TextSignalEvent
 from cltl.combot.infra.config import ConfigurationManager
@@ -15,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 TIMEOUT = 30_000
+
+
+_GREETINGS = [re.sub('[^a-z]+', '', greeting.lower()) for greeting in GREETING]
 
 
 class InitService:
@@ -74,7 +80,8 @@ class InitService:
     def _process(self, event: Event):
         timestamp = timestamp_now()
         if self._face_or_keyword(event) and not self._timeout:
-            self._event_bus.publish(self._text_out_topic, Event.for_payload(self._greeting_payload()))
+            greeting = random.choice(GREETING) + " " + self._greeting
+            self._event_bus.publish(self._text_out_topic, Event.for_payload(self._create_text_signal_event(greeting)))
             self._timeout = timestamp
             logger.info("Start initialization")
         elif self._timeout and timestamp - self._timeout < TIMEOUT and self._start_utterance(event):
@@ -83,6 +90,8 @@ class InitService:
             logger.info("Interaction initialized")
         elif self._timeout and timestamp - self._timeout > TIMEOUT:
             self._timeout = None
+            goodbye = random.choice(GOODBYE) + " Let me know when you are back."
+            self._event_bus.publish(self._text_out_topic, Event.for_payload(self._create_text_signal_event(goodbye)))
             logger.info("Reset initialization")
 
         logger.debug("Unhandled event %s (%s - %s)", event, timestamp, self._timeout)
@@ -96,10 +105,11 @@ class InitService:
                 for mention in event.payload.mentions
                 for annotation in mention.annotations)
         if event.metadata.topic == self._text_in_topic:
-            return "hallo" in event.payload.signal.text.lower()
+            utterance = re.sub('[^a-z]+', '', event.payload.signal.text.lower())
+            return any(greeting in utterance for greeting in _GREETINGS)
 
-    def _greeting_payload(self):
+    def _create_text_signal_event(self, text: str):
         scenario_id = self._emissor_client.get_current_scenario_id()
-        signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None, self._greeting)
+        signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None, text)
 
         return TextSignalEvent.create(signal)
