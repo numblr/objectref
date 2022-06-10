@@ -11,6 +11,7 @@ setup(
     version=version,
     package_dir={'': 'src'},
     packages=find_namespace_packages(include=['cltl.*', 'cltl_service.*'], where='src'),
+    package_data={'cltl.friends': ['queries/*']},
     data_files=[('VERSION', ['VERSION'])],
     url="https://github.com/leolani/cltl-leolani",
     license='MIT License',

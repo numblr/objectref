@@ -4,17 +4,19 @@ import uuid
 from datetime import datetime
 
 import requests
-from cltl.brain import LongTermMemory
-from cltl.combot.event.emissor import LeolaniContext, ScenarioStarted, ScenarioStopped
+from cltl.combot.event.emissor import LeolaniContext, Agent, ScenarioStarted, ScenarioStopped, ScenarioEvent
 from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
 from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.topic_worker import TopicWorker
-from cltl.combot.infra.time_util import timestamp_now
-from cltl.commons.discrete import UtteranceType
 from emissor.representation.scenario import Modality, Scenario
 
+from cltl.friends.brain import BrainFriendsStore
+
 logger = logging.getLogger(__name__)
+
+
+AGENT = Agent("Leolani", "http://cltl.nl/leolani/world/leolani")
 
 
 class ContextService:
@@ -48,10 +50,9 @@ class ContextService:
 
         self._topic_worker = None
 
-        self.AGENT = "Leolani"
-        self.brain = LongTermMemory(address="http://localhost:7200/repositories/sandbox",
-                                    log_dir=pathlib.Path(log_path),
-                                  clear_all=True)
+        self.AGENT = AGENT
+        self._friend_store = BrainFriendsStore(address="http://localhost:7200/repositories/sandbox",
+                                    log_dir=pathlib.Path(log_path))
         self._scenario = None
 
     @property
@@ -59,9 +60,10 @@ class ContextService:
         return None
 
     def start(self, timeout=30):
-        self._topic_worker = TopicWorker([self._intention_topic, self._desire_topic], self._event_bus,
-                                         provides=[self._intention_topic],
-                                         resource_manager=self._resource_manager, processor=self._process,
+        self._topic_worker = TopicWorker([self._intention_topic, self._desire_topic, self._speaker_topic],
+                                         self._event_bus, provides=[self._intention_topic],
+                                         buffer_size=32, processor=self._process,
+                                         resource_manager=self._resource_manager,
                                          name=self.__class__.__name__)
         self._topic_worker.start().wait()
 
@@ -85,11 +87,9 @@ class ContextService:
             if "quit" in achieved:
                 self._stop_scenario()
         elif event.metadata.topic == self._speaker_topic:
-            id_annotation, name_annotation = event.payload.mentions[0].annotations
-            self._scenario.context.speaker = id_annotation.value
-            # TODO set face ID in brain
-            # capsule = {}
-            # self._event_bus.publish(self._knowledge_topic, Event.for_payload(capsule))
+            self._update_scenario(event)
+        else:
+            logger.warning("Unhandled event: %s", event)
 
     def _start_scenario(self):
         scenario, capsule = self._create_scenario()
@@ -99,32 +99,26 @@ class ContextService:
         self._scenario = scenario
         logger.info("Started scenario %s", scenario)
 
+    def _update_scenario(self, event):
+        # TODO multiple mentions
+        mention = event.payload.mentions[0]
+        name_annotation = next(iter(filter(lambda a: a.type == "Entity", mention.annotations)))
+        id_annotation = next(iter(filter(lambda a: a.type == "VectorIdentity", mention.annotations)))
+
+        speaker_name = name_annotation.value.text
+        uri = self._friend_store.add_friend(id_annotation.value, speaker_name,
+                                            scenario_id=self._scenario.id, mention_id=mention.id)
+        self._scenario.context.speaker = Agent(speaker_name, str(uri))
+
+        self._event_bus.publish(self._scenario_topic, Event.for_payload(ScenarioEvent.create(self._scenario)))
+        logger.info("Updated scenario %s", self._scenario)
+
     def _stop_scenario(self):
         self._event_bus.publish(self._scenario_topic,
                                 Event.for_payload(ScenarioStopped.create(self._scenario)))
         logger.info("Stopped scenario %s", self._scenario)
 
-    def _create_speaker_capsule(self, mention_id, id, name):
-        return {}
-        # return {
-        #     "chat": self._scenario.id,
-        #     "turn": mention_id,
-        #     "author": {"label": "leolani", "type": ["robot"],
-        #                'uri': "http://cltl.nl/leolani/friends/leolani"},
-        #     "utterance": "",
-        #     "utterance_type": UtteranceType.STATEMENT,
-        #     "position": "",
-        #     "subject": {"label": name, "type": ["person"], 'uri': None},
-        #     "predicate": {"label": "has face", "uri": "http://cltl.nl/leolani/n2mu/has-face"},
-        #     "object": {"label": id, "type": ["face"], 'uri': None},
-        #     "perspective": {"certainty": 1, "polarity": 1, "sentiment": 0},
-        #     "timestamp": timestamp_now(),
-        #     "context_id": self._scenario.id
-        # }
-
     def _create_scenario(self):
-        AGENT = "Leolani"
-
         signals = {
             Modality.IMAGE.name.lower(): "./image.json",
             Modality.TEXT.name.lower(): "./text.json",
@@ -134,7 +128,7 @@ class ContextService:
         scenario_start = datetime.today().strftime('%Y-%m-%d')
         location = self._get_location()
 
-        scenario_context = LeolaniContext(AGENT, "", str(uuid.uuid4()), location)
+        scenario_context = LeolaniContext(AGENT, Agent(), str(uuid.uuid4()), location, [])
         scenario = Scenario.new_instance(str(uuid.uuid4()), scenario_start, None, scenario_context, signals)
 
         capsule = {
