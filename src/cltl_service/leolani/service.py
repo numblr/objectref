@@ -83,7 +83,7 @@ class LeolaniService:
                                                               logger)
 
             emissor_api.add_speaker_annotation(reply_textSignal, self.AGENT)
-            modifiedPayload = TextSignalEvent.create(reply_textSignal)
+            modifiedPayload = TextSignalEvent.for_agent(reply_textSignal)
             modifiedEvent = Event.for_payload(modifiedPayload)
             self._event_bus.publish("cltl.topic.text_out", modifiedEvent)
             logger.info("UTTERANCE reply (%s): (%s)", modifiedEvent.metadata.topic, modifiedEvent.payload.signal.text)

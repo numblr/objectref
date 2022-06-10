@@ -112,4 +112,4 @@ class InitService:
         scenario_id = self._emissor_client.get_current_scenario_id()
         signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None, text)
 
-        return TextSignalEvent.create(signal)
+        return TextSignalEvent.for_agent(signal)
