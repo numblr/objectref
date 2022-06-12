@@ -26,7 +26,7 @@ def read_query(query_filename):
 
 class FriendSearch(LongTermMemory):
     def __init__(self, address, log_dir):
-        super().__init__(address, log_dir, clear_all=True)
+        super().__init__(address, log_dir)
 
     def search_entity_by_face(self, id):
         query = read_query('./queries/face') % id
