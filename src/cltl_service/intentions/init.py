@@ -17,7 +17,7 @@ from emissor.representation.scenario import TextSignal
 logger = logging.getLogger(__name__)
 
 
-TIMEOUT = 30_000
+TIMEOUT = 120_000
 
 
 _GREETINGS = [re.sub('[^a-z]+', '', greeting.lower()) for greeting in GREETING]
@@ -97,7 +97,7 @@ class InitService:
         logger.debug("Unhandled event %s (%s - %s)", event, timestamp, self._timeout)
 
     def _start_utterance(self, event):
-        return event.metadata.topic == self._text_in_topic and "start" in event.payload.signal.text.lower()
+        return event.metadata.topic == self._text_in_topic and "yes" in event.payload.signal.text.lower()
 
     def _face_or_keyword(self, event):
         if event.metadata.topic == self._face_topic:
