@@ -185,7 +185,7 @@ class ContextService:
         object_labels = [annotation.value.type
                         for mention in event.payload.mentions
                         for annotation in mention.annotations
-                        if annotation.type == "Object"]
+                        if annotation.type == "Object" and annotation.value]
 
         object_counts = Counter(object_labels)
         current_counts = Counter(self._scenario.context.objects)
