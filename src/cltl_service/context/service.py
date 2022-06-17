@@ -162,13 +162,15 @@ class ContextService:
                         for mention in event.payload.mentions
                         for annotation in mention.annotations
                         if annotation.type == "VectorIdentity"]:
-            uri, name = self._friend_store.get_friend(face_id)
-            if name and name != None and uri:
-                agent = Agent(name, uri)
+            uri, names = self._friend_store.get_friend(face_id)
+            if names and names[0] and uri:
+                agent = Agent(names[0], uri)
             elif uri:
-                agent = Agent(uri)
+                agent = Agent(uri=uri)
+            elif face_id:
+                agent = Agent(uri=face_id)
             else:
-                agent = Agent(face_id)
+                logger.debug("No person in event %s", event)
 
             if not agent in self._scenario.context.persons:
                 self._scenario.context.persons.append(agent)

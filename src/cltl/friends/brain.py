@@ -1,8 +1,9 @@
 from pathlib import Path
-from typing import Union, Iterable, List
+from typing import Union, Iterable, List, Tuple
 
 from cltl.brain.infrastructure.rdf_builder import RdfBuilder
 from cltl.combot.infra.time_util import timestamp_now
+from cltl.commons.discrete import UtteranceType
 
 from cltl.friends.api import FriendStore
 from cltl.friends.querying import FriendSearch
@@ -31,10 +32,15 @@ class BrainFriendsStore(FriendStore):
 
         return str(uri)
 
-    def get_friend(self, identifier: str) -> List[str]:
-        uri, name = self._search.search_entity_by_face(self._create_uri(identifier))
+    def get_friend(self, identifier: str) -> Tuple[str, List[str]]:
+        """
+        Find friends.
+        :param identifier:
+        :return: URI of the friend and list of the names associated with the friend.
+        """
+        uri, names = self._search.search_entity_by_face(self._create_uri(identifier))
 
-        return str(uri), name
+        return str(uri), names
 
     def _create_uri(self, label):
         return str(self._rdf_builder.create_resource_uri('LW', label.lower()))
@@ -79,7 +85,6 @@ class BrainFriendsStore(FriendStore):
 
 if __name__ == '__main__':
     from tempfile import TemporaryDirectory
-    from cltl.commons.discrete import UtteranceType
 
     with TemporaryDirectory(prefix="brain-log") as log_path:
         store = BrainFriendsStore(address="http://localhost:7200/repositories/sandbox",
