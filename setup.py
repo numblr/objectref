@@ -11,7 +11,10 @@ setup(
     version=version,
     package_dir={'': 'src'},
     packages=find_namespace_packages(include=['cltl.*', 'cltl_service.*'], where='src'),
-    package_data={'cltl.friends': ['queries/*']},
+    package_data={
+        'cltl.friends': ['queries/*'],
+        "cltl_service.monitoring": ["static/*"]
+    },
     data_files=[('VERSION', ['VERSION'])],
     url="https://github.com/leolani/cltl-leolani",
     license='MIT License',
@@ -21,7 +24,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     python_requires='>=3.7',
-    install_requires=['cltl.combot', 'cltl.emissor-data',
+    install_requires=['cltl.combot', 'cltl.emissor-data', 'cltl.backend',
                       'cltl.brain', 'cltl.triple_extraction', 'cltl.reply_generation',
-                      'emissor', 'jsonpickle'],
+                      'emissor', 'jsonpickle', 'pillow', 'flask'],
 )

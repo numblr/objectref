@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pepper Web View</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <style>
+        body { margin: 0; padding: 10px; height: 100%; }
+        #container { min-width:100%; min-height:100%; position:absolute; text-align: center}
+        #camera { top:0; bottom: 60px; left: 0; right: 0; position:absolute; }
+        #utterance { position:absolute; bottom:0; width:100%; height:60px; font-size: 30px;}
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="camera">
+        <canvas id="camera_canvas"></canvas>
+    </div>
+    <div id="utterance"></div>
+</div>
+
+<script>
+
+// Global Variables //
+WIDTH = 4; HEIGHT = 3;
+
+FONT_SIZE = 30;
+
+camera_canvas = $("#camera_canvas");
+
+// Utility Functions //
+CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+  if (w < 2 * r) r = w / 2;
+  if (h < 2 * r) r = h / 2;
+  this.beginPath();
+  this.moveTo(x+r, y);
+  this.arcTo(x+w, y,   x+w, y+h, r);
+  this.arcTo(x+w, y+h, x,   y+h, r);
+  this.arcTo(x,   y+h, x,   y,   r);
+  this.arcTo(x,   y,   x+w, y,   r);
+  this.closePath();
+  return this;
+}
+
+function scale_canvas(canvas, w, h) {
+    if ($("#camera").width()/w < $("#camera").height()/h) {
+        canvas.width($("#camera").width());
+        canvas.height($("#camera").width()/w*h);
+    }
+    else {
+        canvas.height($("#camera").height());
+        canvas.width($("#camera").height()/h*w);
+    }
+}
+
+// Main Logic //
+
+$(window).resize(function() {
+    scale_canvas(camera_canvas, WIDTH, HEIGHT);
+});
+
+
+$(function() {
+    // Scale Canvas on Start
+    scale_canvas(camera_canvas, WIDTH, HEIGHT);
+
+    var width = camera_canvas[0].width;
+    var height = camera_canvas[0].height;
+
+    // -- Initialize Camera View Context -- //
+    var camera_ctx = camera_canvas[0].getContext('2d');
+    camera_ctx.font = '25px Helvetica';
+
+    // Image for Camera View
+    var img = new Image();
+    var img_hash = null;
+    var img_items = null;
+
+    // Main Data Loop //
+    var load_img = function() {
+        $.get("../text", function (msg, status) {
+            if (status !== 200 && status !== "success") {
+                console.log("Failed to load utterance", status, typeof(success));
+                return;
+            }
+
+            // -- Receive Data from Host -- //
+            data = JSON.parse(msg);
+
+            console.debug("Received text", data);
+
+            $("#utterance").html(data['speaker'] + "> " + data['utterance']);
+        });
+
+        $.get("../image", function (msg, status) {
+            if (status !== 200 && status !== "success") {
+                console.log("Failed to load display", status, typeof(success));
+                return;
+            }
+
+            // -- Receive Data from Host -- //
+            data = JSON.parse(msg);
+
+            if (data['hash'] === img_hash && data['hash'].length === img_items) {
+                return;
+            }
+
+            // -- Update Live View with Camera Image and Object Bounding Boxes -- //
+            items = data['items'];
+            img.onload = function () {
+                // Clear Image
+                camera_ctx.clearRect(0, 0, width, height);
+
+                // Draw Image
+                camera_ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, width, height);
+
+                for (i = 0; i < items.length; i++) {
+                    bounds = items[i]['bounds'];
+
+                    console.debug("name", items[i]["name"], "bounds", bounds);
+
+                    // Draw Bounding Box
+                    camera_ctx.beginPath();
+                    camera_ctx.lineWidth = "3";
+                    camera_ctx.strokeStyle = "black";
+                    camera_ctx.roundRect(bounds[0] / img.width * width, bounds[1] / img.height * height,
+                            (bounds[2] - bounds[0]) / img.width * width, (bounds[3] - bounds[1]) / img.height * height, 5);
+                    camera_ctx.stroke();
+
+                    // Draw Text Box
+                    camera_ctx.beginPath();
+                    camera_ctx.lineWidth = "3";
+                    camera_ctx.fillStyle = "black";
+                    camera_ctx.roundRect(bounds[0] / img.width * width, bounds[3] / img.height * height - FONT_SIZE,
+                            (bounds[2] - bounds[0]) / img.width * width, FONT_SIZE, 5);
+                    camera_ctx.fill();
+
+                    // Draw Text
+                    let name = items[i]['name'] && items[i]['name'].substring(0, 13);
+                    camera_ctx.fillStyle = 'white';
+                    camera_ctx.fillText(name, bounds[0] / img.width * width + 10,
+                            bounds[3] / img.height  * height - FONT_SIZE / 4);
+                }
+            };
+
+            // Set Image (Which will trigger image.onload)
+            img.src = 'data:image/png;base64,' + data['img'];
+
+            img_hash = data['hash'];
+            img_items = data['items'].length;
+        });
+    };
+
+    setInterval(load_img, 1000);
+});
+
+
+</script>
+</body>
+</html>
