@@ -1,23 +1,41 @@
-import base64
+import io
 import json
 import logging
 import pathlib
-from io import BytesIO
+from hashlib import md5
+from functools import wraps
+from http import HTTPStatus
 from typing import Callable
 
 import flask
-from flask import Response
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from cltl.backend.source.client_source import ClientImageSource
 from cltl.backend.spi.image import ImageSource
 from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
 from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.topic_worker import TopicWorker
+from flask import Response, request
 
 from cltl.friends.brain import BrainFriendsStore
 
 logger = logging.getLogger(__name__)
+
+
+FONT = ImageFont.load_default()
+
+
+def no_cache(f):
+    """ Flask decorator that sets headers to prevent caching. """
+    @wraps(f)
+    def wrapped_f(*args, **kwargs):
+        response = f(*args, **kwargs)
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+
+        return response
+    return wrapped_f
 
 
 class MonitoringService:
@@ -59,7 +77,7 @@ class MonitoringService:
                                     log_dir=pathlib.Path(log_path))
         self._app = None
         self._text_info = None
-        self._display_info = None
+        self._image = None
 
     @property
     def app(self):
@@ -68,25 +86,31 @@ class MonitoringService:
 
         self._app = flask.Flask(__name__)
 
-        @self._app.route('/image', methods=['GET'])
-        def display_info():
-            if self._display_info:
-                return json.dumps(self._display_info)
-
-            return Response(status=404)
-
         @self._app.route('/text', methods=['GET'])
+        @no_cache
         def text_info():
-            if self._text_info:
-                return json.dumps(self._text_info)
+            if not self._text_info:
+                return Response(status=HTTPStatus.NOT_FOUND)
 
-            return Response(status=404)
+            return Response(json.dumps(self._text_info), mimetype="application/json")
 
-        @self._app.after_request
-        def set_cache_control(response):
-            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            response.headers['Pragma'] = 'no-cache'
-            response.headers['Expires'] = '0'
+        @self._app.route('/image', methods=['GET'])
+        def _image():
+            if not self._image:
+                return Response(status=HTTPStatus.NOT_FOUND)
+
+            img_hash = md5(self._image.tobytes()).hexdigest()
+            logger.debug("ETag: %s, current: %s", request.if_none_match, img_hash)
+            if request.if_none_match and img_hash in request.if_none_match:
+                return Response(status=HTTPStatus.NOT_MODIFIED, headers={'ETag': img_hash})
+
+            img_src = io.BytesIO()
+            self._image.save(img_src, format="PNG")
+            img_src.seek(0)
+
+            response = flask.send_file(img_src, mimetype='image/png')
+            response.headers['Cache-Control'] = 'no-cache, must-revalidate'
+            response.headers['ETag'] = img_hash
 
             return response
 
@@ -134,18 +158,9 @@ class MonitoringService:
         with self._image_loader(image_location) as source:
             image = source.capture()
 
-        # Construct Display Info (to be send to webclient)
-        self._display_info = {
-            "hash": hash(str(image.image)),
-            "img": self._encode_image(Image.fromarray(image.image)),
-            "items": [],
-        }
+        self._image = Image.fromarray(image.image)
 
-    def _encode_image(self, image):
-        with BytesIO() as png:
-            image.save(png, 'png')
-            png.seek(0)
-            return base64.b64encode(png.read()).decode('utf-8')
+        logger.debug("Updated image")
 
     def _update_people(self, event):
         items = []
@@ -155,7 +170,6 @@ class MonitoringService:
                         for annotation in mention.annotations
                         if annotation.type == "VectorIdentity" and mention.segment]:
             _, names = self._friend_store.get_friend(face_id)
-
             if names and names[0]:
                 name = names[0]
             elif face_id:
@@ -165,7 +179,7 @@ class MonitoringService:
 
             items.append((name, bounds))
 
-        self._add_items(items)
+        self._annotate_image(items)
 
     def _update_objects(self, event):
         objects = [(annotation.value.type, mention.segment[0].bounds)
@@ -173,12 +187,15 @@ class MonitoringService:
                         for annotation in mention.annotations
                         if annotation.type == "Object" and annotation.value and mention.segment]
 
-        self._add_items(objects)
+        self._annotate_image(objects)
 
-    def _add_items(self, items):
-        if self._display_info:  # If Ready to Populate
-            # Add Items to Display Info
-            self._display_info["items"] += [
-                {"name": name,
-                 "bounds": bounds,
-                 } for name, bounds in items]
+    def _annotate_image(self, items) -> None:
+        if not self._image or not items:
+            return
+
+        draw = ImageDraw.Draw(self._image)
+        for name, bbox in items:
+            draw.rectangle(bbox, outline=(0, 0, 0))
+            draw.text((bbox[0], bbox[1]), name, fill=(255, 0, 0), font=FONT)
+
+        logger.debug("Draw %s items in image", len(items))
