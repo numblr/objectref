@@ -12,7 +12,7 @@
 </head>
 <body>
 
-<img id="image" src="../image.png?0">
+<img id="image" src="image_1.png?0">
 
 <div id="container">
     <div id="camera"></div>
@@ -26,19 +26,19 @@ $(function() {
     var load_data = function() {
         cnt += 1;
         try {
-            $.get("../text", function (msg, status) {
+            $.get("data.json", function (msg, status) {
                 if (status !== 200 && status !== "success") {
                     $("#utterance").html("Get Failed with status " + status);
                     return;
                 }
 
                 // -- Receive Data from Host -- //
-                $("#utterance").html(msg['speaker'] + "> " + msg['utterance']);
+                $("#utterance").html(msg['speaker'] + "(" + cnt+ ")> " + msg['utterance']);
             });
         } catch (e) {
             $("#utterance").html("Get Failed with exception " + e);
         }
-        $("#image").attr("src", "../image.png?" + cnt);
+        $("#image").attr("src", "image_" + (cnt % 2) + ".png?" + cnt);
     };
 
     setInterval(load_data, 2500);
