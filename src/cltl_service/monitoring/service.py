@@ -81,6 +81,7 @@ class MonitoringService:
         self._app = None
         self._text_info = None
         self._image = None
+        self._display = None
 
     @property
     def app(self):
@@ -99,14 +100,10 @@ class MonitoringService:
 
         @self._app.route('/image.jpg', methods=['GET'])
         def _image():
-            if not self._image:
+            if not self._display:
                 return Response(status=HTTPStatus.NOT_FOUND)
 
-            img_src = io.BytesIO()
-            self._resize_image(self._image).save(img_src, format="JPEG")
-            img_src.seek(0)
-
-            response = flask.send_file(img_src, mimetype='image/jpeg')
+            response = flask.send_file(io.BytesIO(self._display), mimetype='image/jpeg')
 
             return response
 
@@ -155,6 +152,7 @@ class MonitoringService:
             image = source.capture()
 
         self._image = Image.fromarray(image.image)
+        self._create_display(self._image)
 
         logger.debug("Updated image")
 
@@ -191,12 +189,6 @@ class MonitoringService:
 
         self._annotate_image(objects)
 
-    def _resize_image(self, image) -> Image:
-        factor = 1200/image.size[0]
-        new_size = tuple(int(factor * dim) for dim in image.size)
-
-        return image.resize(new_size, Image.ANTIALIAS)
-
     def _annotate_image(self, items) -> None:
         if not self._image or not items:
             return
@@ -206,4 +198,18 @@ class MonitoringService:
             draw.rectangle(bbox, outline=(0, 0, 0))
             draw.text((bbox[0], bbox[1]), (name[:12] + ".." if len(name) > 12 else name), fill=(255, 0, 0), font=FONT)
 
+        self._create_display(self._image)
+
         logger.debug("Draw %s items in image", len(items))
+
+    def _create_display(self, image) -> None:
+        factor = min(1200/image.size[0], 750/image.size[1])
+        new_size = tuple(int(factor * dim) for dim in image.size)
+
+        resized = image.resize(new_size, Image.ANTIALIAS)
+
+        img_src = io.BytesIO()
+        resized.save(img_src, format="JPEG")
+        img_src.seek(0)
+
+        self._display = img_src.read()
