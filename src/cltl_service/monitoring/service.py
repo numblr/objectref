@@ -2,7 +2,6 @@ import io
 import json
 import logging
 from functools import wraps
-from hashlib import md5
 from http import HTTPStatus
 from typing import Callable
 
@@ -14,14 +13,20 @@ from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
 from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.topic_worker import TopicWorker
-from flask import Response, request
+from flask import Response
 
 from cltl.friends.api import FriendStore
 
 logger = logging.getLogger(__name__)
 
 
-FONT = ImageFont.load_default()
+try:
+    import matplotlib.font_manager
+    system_fonts = matplotlib.font_manager.findSystemFonts(fontpaths=None, fontext='ttf')
+    arial = next(f for f in system_fonts if 'arial' in f.lower() and 'bold' in f.lower())
+    FONT = ImageFont.truetype(arial, 25)
+except:
+    FONT = ImageFont.load_default()
 
 
 def no_cache(f):
@@ -47,9 +52,6 @@ class MonitoringService:
         vector_id_topic = config.get("topic_vector_id")
         text_in_topic = config.get("topic_text_in")
         text_out_topic = config.get("topic_text_out")
-
-        config = config_manager.get_config("cltl.brain")
-        log_path = config.get("log_dir")
 
         def image_loader(url) -> ImageSource:
             return ClientImageSource.from_config(config_manager, url)
@@ -95,23 +97,16 @@ class MonitoringService:
 
             return Response(json.dumps(self._text_info), mimetype="application/json")
 
-        @self._app.route('/image.png', methods=['GET'])
+        @self._app.route('/image.jpg', methods=['GET'])
         def _image():
             if not self._image:
                 return Response(status=HTTPStatus.NOT_FOUND)
 
-            img_hash = md5(self._image.tobytes()).hexdigest()
-            logger.debug("ETag: %s, current: %s", request.if_none_match, img_hash)
-            if request.if_none_match and img_hash in request.if_none_match:
-                return Response(status=HTTPStatus.NOT_MODIFIED, headers={'ETag': img_hash})
-
             img_src = io.BytesIO()
-            self._image.save(img_src, format="PNG")
+            self._resize_image(self._image).save(img_src, format="JPEG")
             img_src.seek(0)
 
-            response = flask.send_file(img_src, mimetype='image/png')
-            response.headers['Cache-Control'] = 'no-cache, must-revalidate'
-            response.headers['ETag'] = img_hash
+            response = flask.send_file(img_src, mimetype='image/jpeg')
 
             return response
 
@@ -196,6 +191,12 @@ class MonitoringService:
 
         self._annotate_image(objects)
 
+    def _resize_image(self, image) -> Image:
+        factor = 1200/image.size[0]
+        new_size = tuple(int(factor * dim) for dim in image.size)
+
+        return image.resize(new_size, Image.ANTIALIAS)
+
     def _annotate_image(self, items) -> None:
         if not self._image or not items:
             return
@@ -203,6 +204,6 @@ class MonitoringService:
         draw = ImageDraw.Draw(self._image)
         for name, bbox in items:
             draw.rectangle(bbox, outline=(0, 0, 0))
-            draw.text((bbox[0], bbox[1]), name, fill=(255, 0, 0), font=FONT)
+            draw.text((bbox[0], bbox[1]), (name[:12] + ".." if len(name) > 12 else name), fill=(255, 0, 0), font=FONT)
 
         logger.debug("Draw %s items in image", len(items))
