@@ -1,7 +1,8 @@
 from pathlib import Path
+from typing import List, Tuple, Mapping
 
 import importlib_resources as pkg_resources
-import rdflib
+import itertools
 from cltl.brain.long_term_memory import LongTermMemory
 
 import cltl.friends
@@ -36,18 +37,25 @@ class FriendSearch(LongTermMemory):
         else:
             return None, None
 
+    def search_faces(self) -> Mapping[str, Tuple[str, List[str]]]:
+        query = read_query('./queries/faces')
+        response = self._submit_query(query)
+        if response:
+            return [(entity['face_id']['value'].split("/")[-1], entity['person']['value'], entity['name']['value'])
+                            for entity in response]
+        else:
+            return None
+
     def create_uri(self, label):
         return str(self._rdf_builder.create_resource_uri('LW', label.lower()))
+
 
 if __name__ == '__main__':
     from tempfile import TemporaryDirectory
     from cltl.commons.discrete import UtteranceType
 
-    with TemporaryDirectory(prefix="brain-log") as log_path:
-        entity_search = FriendSearch(address="http://localhost:7200/repositories/sandbox",
-                                     log_dir=Path(log_path))
-
-        capsule = {
+    def capsule(identifier, name):
+        return {
             'chat': "chat_1",
             'turn': "mention_1",
             'author': {
@@ -59,9 +67,9 @@ if __name__ == '__main__':
             'utterance_type': UtteranceType.STATEMENT,
             'position': '',
             'subject': {
-                'label': "Thomas",
+                'label': name,
                 'type': ['person'],
-                'uri': "http://cltl.nl/leolani/world/carl"
+                'uri': f"http://cltl.nl/leolani/world/{name}"
             },
             'predicate': {
                 'label': "faceID",
@@ -69,7 +77,7 @@ if __name__ == '__main__':
                 'uri': "http://cltl.nl/leolani/n2mu/faceID"
             },
             'object': {
-                'label': "face_1",
+                'label': identifier,
                 'type': ['Literal'],
                 'uri': None
             },
@@ -83,7 +91,14 @@ if __name__ == '__main__':
             'timestamp': 1
         }
 
-        entity_search.capsule_statement(capsule, create_label=True)
+    with TemporaryDirectory(prefix="brain-log") as log_path:
+        entity_search = FriendSearch(address="http://localhost:7200/repositories/sandbox",
+                                     log_dir=Path(log_path))
+
+        entity_search.capsule_statement(capsule("face_1", "Piek"), create_label=True)
+        entity_search.capsule_statement(capsule("face_2", "Thomas"), create_label=True)
         print(entity_search.get_triples_with_predicate("http://cltl.nl/leolani/n2mu/faceID"))
         print(entity_search.search_entity_by_face(entity_search.create_uri("face_1")))
+        print(entity_search.search_faces())
+
 

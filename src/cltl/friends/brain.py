@@ -1,5 +1,6 @@
+import itertools
 from pathlib import Path
-from typing import Union, Iterable, List, Tuple
+from typing import Union, Iterable, List, Tuple, Mapping
 
 from cltl.brain.infrastructure.rdf_builder import RdfBuilder
 from cltl.combot.infra.time_util import timestamp_now
@@ -41,6 +42,26 @@ class BrainFriendsStore(FriendStore):
         uri, names = self._search.search_entity_by_face(self._create_uri(identifier))
 
         return str(uri), names
+
+    def get_friends(self) -> Mapping[str, Tuple[str, List[str]]]:
+        face_entries = self._search.search_faces()
+        if not face_entries:
+            return {}
+
+        face_entries = sorted(face_entries, key=lambda entry: entry[0])
+
+        faces = dict()
+        for face_id, group in itertools.groupby(face_entries, key=lambda entry: entry[0]):
+            face_entries = list(group)
+            if len(set(entry[1] for entry in face_entries)) > 1:
+                raise ValueError("Face is assigned to multiple persons: " + face_id)
+
+            faces[face_id] = face_entries[0][1], [entry[2] for entry in face_entries]
+
+        return faces
+
+    def get_identifieres(self) -> List[str]:
+        return self.get_friends().keys()
 
     def _create_uri(self, label):
         return str(self._rdf_builder.create_resource_uri('LW', label.lower()))
@@ -88,8 +109,9 @@ if __name__ == '__main__':
 
     with TemporaryDirectory(prefix="brain-log") as log_path:
         store = BrainFriendsStore(address="http://localhost:7200/repositories/sandbox",
-                                     log_dir=Path(log_path))
+                                  log_dir=Path(log_path))
 
         print("1", store.add_friend("face_1", "thomas"))
         friend, name = store.get_friend("face_1")
         print("2", friend, name)
+        print("3", store.get_friends())

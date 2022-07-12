@@ -1,5 +1,4 @@
 import logging
-import pathlib
 import uuid
 from collections import Counter
 from datetime import datetime
@@ -12,7 +11,7 @@ from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.topic_worker import TopicWorker
 from emissor.representation.scenario import Modality, Scenario
 
-from cltl.friends.brain import BrainFriendsStore
+from cltl.friends.api import FriendStore
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,8 @@ AGENT = Agent("Leolani", "http://cltl.nl/leolani/world/leolani")
 
 class ContextService:
     @classmethod
-    def from_config(cls, event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
+    def from_config(cls, friend_store: FriendStore,
+                    event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
         config = config_manager.get_config("cltl.context")
         scenario_topic = config.get("topic_scenario")
         speaker_topic = config.get("topic_speaker")
@@ -32,18 +32,15 @@ class ContextService:
         intention_topic = config.get("topic_intention")
         desire_topic = config.get("topic_desire")
 
-        config = config_manager.get_config("cltl.brain")
-        log_path = config.get("log_dir")
-
         return cls(scenario_topic, speaker_topic, knowledge_topic,
                    object_topic, vector_id_topic,
                    intention_topic, desire_topic,
-                   log_path, event_bus, resource_manager)
+                   friend_store, event_bus, resource_manager)
 
     def __init__(self, scenario_topic: str, speaker_topic: str, knowledge_topic: str,
                  object_topic: str, vector_id_topic: str,
-                 intention_topic: str, desire_topic: str, log_path: str,
-                 event_bus: EventBus, resource_manager: ResourceManager):
+                 intention_topic: str, desire_topic: str,
+                 friend_store: FriendStore, event_bus: EventBus, resource_manager: ResourceManager):
         self._event_bus = event_bus
         self._resource_manager = resource_manager
 
@@ -58,8 +55,7 @@ class ContextService:
         self._topic_worker = None
 
         self.AGENT = AGENT
-        self._friend_store = BrainFriendsStore(address="http://localhost:7200/repositories/sandbox",
-                                    log_dir=pathlib.Path(log_path))
+        self._friend_store = friend_store
         self._scenario = None
 
     @property

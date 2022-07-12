@@ -1,4 +1,4 @@
-from typing import Union, Iterable, List, Tuple
+from typing import Union, Iterable, List, Tuple, Mapping
 
 
 class FriendStore:
@@ -12,5 +12,17 @@ class FriendStore:
     def get_friend(self, identifier: str) -> Tuple[str, List[str]]:
         """
         Get the URI and names of a friend by identifier.
+        """
+        raise NotImplementedError()
+
+    def get_friends(self) -> Mapping[str, Tuple[str, List[str]]]:
+        """
+        Get a mapping from friend identifiers to the URI and names.
+        """
+        raise NotImplementedError()
+
+    def get_identifieres(self) -> List[str]:
+        """
+        Get all identifiers from the FriendStore.
         """
         raise NotImplementedError()

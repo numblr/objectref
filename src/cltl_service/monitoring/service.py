@@ -1,9 +1,8 @@
 import io
 import json
 import logging
-import pathlib
-from hashlib import md5
 from functools import wraps
+from hashlib import md5
 from http import HTTPStatus
 from typing import Callable
 
@@ -17,7 +16,7 @@ from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.topic_worker import TopicWorker
 from flask import Response, request
 
-from cltl.friends.brain import BrainFriendsStore
+from cltl.friends.api import FriendStore
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,8 @@ def no_cache(f):
 
 class MonitoringService:
     @classmethod
-    def from_config(cls, event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
+    def from_config(cls, friend_store: FriendStore,
+                    event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
         config = config_manager.get_config("cltl.monitoring")
         image_topic = config.get("topic_image")
         object_topic = config.get("topic_object")
@@ -54,11 +54,11 @@ class MonitoringService:
         def image_loader(url) -> ImageSource:
             return ClientImageSource.from_config(config_manager, url)
 
-        return cls(image_topic, object_topic, vector_id_topic, text_in_topic, text_out_topic, log_path,
-                   image_loader, event_bus, resource_manager)
+        return cls(image_topic, object_topic, vector_id_topic, text_in_topic, text_out_topic,
+                   image_loader, friend_store, event_bus, resource_manager)
 
     def __init__(self, image_topic: str, object_topic: str, vector_id_topic: str, text_in_topic: str, text_out_topic: str,
-                 log_path: str, image_loader: Callable[[str], ImageSource],
+                 image_loader: Callable[[str], ImageSource], friend_store: FriendStore,
                  event_bus: EventBus, resource_manager: ResourceManager):
         self._event_bus = event_bus
         self._resource_manager = resource_manager
@@ -73,8 +73,9 @@ class MonitoringService:
 
         self._topic_worker = None
 
-        self._friend_store = BrainFriendsStore(address="http://localhost:7200/repositories/sandbox",
-                                    log_dir=pathlib.Path(log_path))
+        self._friend_store = friend_store
+        self._friend_cache = dict()
+
         self._app = None
         self._text_info = None
         self._image = None
@@ -169,17 +170,23 @@ class MonitoringService:
                         for mention in event.payload.mentions
                         for annotation in mention.annotations
                         if annotation.type == "VectorIdentity" and mention.segment]:
-            _, names = self._friend_store.get_friend(face_id)
-            if names and names[0]:
-                name = names[0]
-            elif face_id:
-                name = face_id
-            else:
-                continue
-
-            items.append((name, bounds))
+            if face_id:
+                items.append((self._get_name(face_id), bounds))
 
         self._annotate_image(items)
+
+    def _get_name(self, face_id):
+        if face_id in self._friend_cache:
+            return self._friend_cache[face_id]
+
+        _, names = self._friend_store.get_friend(face_id)
+        if names and names[0]:
+            name = names[0]
+            self._friend_cache[face_id] = name
+
+            return name
+
+        return face_id
 
     def _update_objects(self, event):
         objects = [(annotation.value.type, mention.segment[0].bounds)

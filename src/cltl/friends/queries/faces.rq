@@ -1,0 +1,10 @@
+prefix n2mu: <http://cltl.nl/leolani/n2mu/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+select ?person ?face_id ?name
+where {
+    ?person rdf:type n2mu:person .
+    ?person n2mu:faceID ?face_id .
+    ?person rdfs:label ?name .
+}
