@@ -15,9 +15,10 @@
 
 $(function() {
     var cnt = 0;
+    let $image = $("#image");
     var load_data = function() {
         cnt += 1;
-        $("#image").attr("src", "../image.jpg?" + cnt);
+        $image.attr("src", "../image.jpg?" + cnt);
     };
 
     setInterval(load_data, 2500);
