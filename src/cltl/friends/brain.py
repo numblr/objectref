@@ -53,8 +53,8 @@ class BrainFriendsStore(FriendStore):
         faces = dict()
         for face_id, group in itertools.groupby(face_entries, key=lambda entry: entry[0]):
             face_entries = list(group)
-            # if len(set(entry[1] for entry in face_entries)) > 1:
-            #     raise ValueError("Face is assigned to multiple persons: " + face_id)
+            if len(set(entry[1] for entry in face_entries)) > 1:
+                raise ValueError("Face is assigned to multiple persons: " + face_id)
 
             faces[face_id] = face_entries[0][1], [entry[2] for entry in face_entries]
 
