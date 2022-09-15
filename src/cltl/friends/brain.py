@@ -18,9 +18,10 @@ class BrainFriendsStore(FriendStore):
 
     def add_friend(self, identifier: str, names: Union[str, Iterable[str]],
                    scenario_id: str = None, mention_id: str = None) -> str:
-        names = [names] if isinstance(names, str) else names
         if not names:
             return
+
+        names = [names] if isinstance(names, str) else names
 
         self._search.capsule_statement(
             self._create_speaker_capsule(scenario_id, mention_id, None, identifier, names[0]),
