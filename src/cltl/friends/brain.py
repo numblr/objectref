@@ -23,14 +23,18 @@ class BrainFriendsStore(FriendStore):
 
         names = [names] if isinstance(names, str) else names
 
+        uri, _ = self._search.search_entity_by_face(self._create_uri(identifier))
         self._search.capsule_statement(
-            self._create_speaker_capsule(scenario_id, mention_id, None, identifier, names[0]),
+            self._create_speaker_capsule(scenario_id, mention_id, uri, identifier, names[0]),
             create_label=True)
-        uri, name = self._search.search_entity_by_face(self._create_uri(identifier))
+
+        if not uri:
+            uri, _ = self._search.search_entity_by_face(self._create_uri(identifier))
 
         for name in names[1:]:
-            self._search.capsule_statement(self._create_speaker_capsule(scenario_id, mention_id, uri, identifier, name),
-                                           create_label=True)
+            self._search.capsule_statement(
+                self._create_speaker_capsule(scenario_id, mention_id, uri, identifier, name),
+                create_label=True)
 
         return str(uri)
 
