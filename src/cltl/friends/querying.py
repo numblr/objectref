@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import List, Tuple, Mapping
 
 import importlib_resources as pkg_resources
-import itertools
 from cltl.brain.long_term_memory import LongTermMemory
 
 import cltl.friends

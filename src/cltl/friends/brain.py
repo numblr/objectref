@@ -1,3 +1,5 @@
+import logging
+
 import itertools
 from pathlib import Path
 from typing import Union, Iterable, List, Tuple, Mapping
@@ -8,6 +10,9 @@ from cltl.commons.discrete import UtteranceType
 
 from cltl.friends.api import FriendStore
 from cltl.friends.querying import FriendSearch
+
+
+logger = logging.getLogger(__name__)
 
 
 class BrainFriendsStore(FriendStore):
@@ -59,7 +64,7 @@ class BrainFriendsStore(FriendStore):
         for face_id, group in itertools.groupby(face_entries, key=lambda entry: entry[0]):
             face_entries = list(group)
             if len(set(entry[1] for entry in face_entries)) > 1:
-                raise ValueError("Face is assigned to multiple persons: " + face_id)
+                logger.warning("Face is assigned to multiple persons: %s", face_id)
 
             faces[face_id] = face_entries[0][1], [entry[2] for entry in face_entries]
 
