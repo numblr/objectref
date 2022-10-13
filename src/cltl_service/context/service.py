@@ -9,7 +9,8 @@ from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
 from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.topic_worker import TopicWorker
-from emissor.representation.scenario import Modality, Scenario
+from cltl.object_recognition.api import Object
+from emissor.representation.scenario import Modality, Scenario, class_type
 
 from cltl.friends.api import FriendStore
 
@@ -154,6 +155,7 @@ class ContextService:
 
     def _update_scenario_context_people(self, event):
         added = False
+        # TODO replace "VectorIdentity" with class_type(VectorIdentity)
         for face_id in [annotation.value
                         for mention in event.payload.mentions
                         for annotation in mention.annotations
@@ -166,9 +168,10 @@ class ContextService:
             elif face_id:
                 agent = Agent(uri=face_id)
             else:
+                agent = None
                 logger.debug("No person in event %s", event)
 
-            if not agent in self._scenario.context.persons:
+            if agent and agent not in self._scenario.context.persons:
                 self._scenario.context.persons.append(agent)
 
             added = True
@@ -181,7 +184,7 @@ class ContextService:
         object_labels = [annotation.value.type
                         for mention in event.payload.mentions
                         for annotation in mention.annotations
-                        if annotation.type == "Object" and annotation.value]
+                        if annotation.type == class_type(Object) and annotation.value]
 
         object_counts = Counter(object_labels)
         current_counts = Counter(self._scenario.context.objects)

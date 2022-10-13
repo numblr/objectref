@@ -24,7 +24,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     python_requires='>=3.7',
-    install_requires=['cltl.combot', 'cltl.emissor-data', 'cltl.backend',
+    install_requires=['cltl.combot', 'cltl.emissor-data', 'cltl.backend', 'cltl.object-recognition', 'cltl.face-recognition',
                       'cltl.brain', 'cltl.triple_extraction', 'cltl.reply_generation',
                       'emissor', 'jsonpickle', 'pillow', 'flask'],
 )

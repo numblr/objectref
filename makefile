@@ -6,6 +6,8 @@ project_dependencies ?= $(addprefix $(project_root)/, \
 		cltl-backend \
 		cltl-emissor-data \
 		cltl-requirements \
+		cltl-face-recognition \
+		cltl-object-recognition \
 		cltl-knowledgerepresentation \
 		cltl-knowledgeextraction \
 		cltl-languagegeneration)
