@@ -13,6 +13,8 @@ from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
 from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.topic_worker import TopicWorker
+from cltl.object_recognition.api import Object
+from emissor.representation.scenario import class_type
 from flask import Response
 
 from cltl.friends.api import FriendStore
@@ -159,6 +161,7 @@ class MonitoringService:
     def _update_people(self, event):
         items = []
 
+        # TODO replace "VectorIdentity" with class_type(VectorIdentity)
         for face_id, bounds in [(annotation.value, mention.segment[0].bounds)
                         for mention in event.payload.mentions
                         for annotation in mention.annotations
@@ -183,9 +186,9 @@ class MonitoringService:
 
     def _update_objects(self, event):
         objects = [(annotation.value.type, mention.segment[0].bounds)
-                        for mention in event.payload.mentions
-                        for annotation in mention.annotations
-                        if annotation.type == "Object" and annotation.value and mention.segment]
+                   for mention in event.payload.mentions
+                   for annotation in mention.annotations
+                   if annotation.type == class_type(Object) and annotation.value and mention.segment]
 
         self._annotate_image(objects)
 
