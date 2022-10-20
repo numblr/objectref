@@ -185,7 +185,7 @@ class MonitoringService:
         return face_id
 
     def _update_objects(self, event):
-        objects = [(annotation.value.type, mention.segment[0].bounds)
+        objects = [(annotation.value.label, mention.segment[0].bounds)
                    for mention in event.payload.mentions
                    for annotation in mention.annotations
                    if annotation.type == class_type(Object) and annotation.value and mention.segment]
