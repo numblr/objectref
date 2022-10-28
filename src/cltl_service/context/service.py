@@ -92,7 +92,7 @@ class ContextService:
             if "quit" in achieved:
                 self._stop_scenario()
         elif event.metadata.topic == self._speaker_topic:
-            self._update_scenario(event)
+            self._update_scenario_speaker(event)
         elif event.metadata.topic == self._object_topic:
             self._update_scenario_context_objects(event)
         elif event.metadata.topic == self._vector_id_topic:
@@ -108,7 +108,7 @@ class ContextService:
         self._scenario = scenario
         logger.info("Started scenario %s", scenario)
 
-    def _update_scenario(self, event):
+    def _update_scenario_speaker(self, event):
         # TODO multiple mentions
         mention = event.payload.mentions[0]
         name_annotation = next(iter(filter(lambda a: a.type == "Entity", mention.annotations)))
