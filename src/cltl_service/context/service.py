@@ -181,7 +181,7 @@ class ContextService:
             logger.info("Updated scenario with persons %s", self._scenario)
 
     def _update_scenario_context_objects(self, event):
-        object_labels = [annotation.value.type
+        object_labels = [annotation.value.label
                         for mention in event.payload.mentions
                         for annotation in mention.annotations
                         if annotation.type == class_type(Object) and annotation.value]
