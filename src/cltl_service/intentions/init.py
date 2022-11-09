@@ -66,6 +66,7 @@ class InitService:
                                          self._event_bus, provides=[self._text_out_topic],
                                          intentions=["init"], intention_topic=self._intention_topic,
                                          resource_manager=self._resource_manager, processor=self._process,
+                                         scheduled=30,
                                          name=self.__class__.__name__)
         self._topic_worker.start().wait()
 
@@ -79,11 +80,15 @@ class InitService:
 
     def _process(self, event: Event):
         timestamp = timestamp_now()
-        if self._face_or_keyword(event) and not self._timeout:
+
+        scheduled_invocation = event is None
+        if (scheduled_invocation or self._face_or_keyword(event)) and not self._timeout:
             greeting = random.choice(GREETING) + " " + self._greeting
             self._event_bus.publish(self._text_out_topic, Event.for_payload(self._create_text_signal_event(greeting)))
             self._timeout = timestamp
             logger.info("Start initialization")
+        elif scheduled_invocation:
+            pass
         elif self._timeout and timestamp - self._timeout < TIMEOUT and self._start_utterance(event):
             self._timeout = None
             self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(["initialized"])))
