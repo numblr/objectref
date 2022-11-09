@@ -56,7 +56,7 @@ class InitializeChatService():
         self._topic_worker = TopicWorker(topics, self._event_bus,
                                          provides=[self._speaker_mention_topic],
                                          resource_manager=self._resource_manager,
-                                         buffer=5,
+                                         buffer_size=4,
                                          processor=self._process, name=self.__class__.__name__)
         self._topic_worker.start().wait()
 
@@ -82,7 +82,7 @@ class InitializeChatService():
         if self._is_chat_intention(event):
             response_payload = self._create_payload()
             self._event_bus.publish(self._speaker_mention_topic, Event.for_payload(response_payload))
-            logger.debug("Starting to chat, created a text mention")
+            logger.debug("Starting to chat with text mention %s", response_payload)
 
     def _is_chat_intention(self, event):
         return (event.metadata.topic == self._intention_topic
@@ -99,7 +99,8 @@ class InitializeChatService():
             "utterance": "",
             "utterance_type": UtteranceType.TEXT_MENTION,
             "position": "",
-            "item": self._get_author().update({'id': None}),
+            "item": self._get_author() | {'id': None},
+            "perspective": {},
             'confidence': 1,
             "timestamp": timestamp_now(),
             "context_id": scenario_id
