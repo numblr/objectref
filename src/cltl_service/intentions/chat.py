@@ -24,15 +24,14 @@ class InitializeChatService():
                     config_manager: ConfigurationManager):
         config = config_manager.get_config("cltl.leolani.intentions.chat")
 
-        intention_topic = config.get("topic_intention") if "topic_intention" in config else None
-        intentions = config.get("intentions") if "intentions" in config else None
+        init_interval = config.get("init_interval") if "init_interval" in config else None
 
         return cls(config.get("topic_scenario"), config.get("topic_utterance"), config.get("topic_speaker_mention"),
-                   intention_topic, intentions,
+                   config.get("topic_intention"), config.get("intentions"), init_interval,
                    emissor_client, event_bus, resource_manager)
 
     def __init__(self, scenario_topic: str, utterance_topic: str, speaker_mention_topic: str,
-                 intention_topic: str, intentions: List[str],
+                 intention_topic: str, intentions: List[str], init_interval: int,
                  emissor_client: EmissorDataClient, event_bus: EventBus, resource_manager: ResourceManager):
 
         self._emissor_client = emissor_client
@@ -48,14 +47,20 @@ class InitializeChatService():
 
         self._topic_worker = None
 
+        self._init_interval = init_interval
+
         self._speaker = None
         self._last_utterance = None
+        self._last_utterance_time = None
+        self._active = False
+        self._initialized = False
 
     def start(self, timeout=30):
         topics = [self._scenario_topic, self._intention_topic]
         self._topic_worker = TopicWorker(topics, self._event_bus,
                                          provides=[self._speaker_mention_topic],
                                          resource_manager=self._resource_manager,
+                                         scheduled=self._init_interval//2 if self._init_interval else None,
                                          buffer_size=4,
                                          processor=self._process, name=self.__class__.__name__)
         self._topic_worker.start().wait()
@@ -72,22 +77,38 @@ class InitializeChatService():
         """
         This uses the last utterance before switching intention to 'chat'
         """
-        if event.metadata.topic == self._scenario_topic:
-            if event.payload.scenario.context.speaker:
-                self._speaker = event.payload.scenario.context.speaker
-
-        if event.metadata.topic == self._utterance_topic:
+        if not event and self._last_utterance_time and self._init_interval:
+            time_elapsed = timestamp_now() - self._last_utterance_time
+            self._initialized = time_elapsed < self._init_interval // 1000
+            logger.debug("Reset chat initialization after %s", time_elapsed)
+        elif not event:
+            pass
+        elif event.metadata.topic == self._scenario_topic and event.payload.scenario.context.speaker:
+            self._speaker = event.payload.scenario.context.speaker
+            logger.debug("Set speaker to %s", self._speaker)
+        elif event.metadata.topic == self._utterance_topic:
             self._last_utterance = event.payload.signal.id
+            self._last_utterance_time = event.metadata.timestamp
+            # TODO ensure timestamps are millisec
+            # self._last_utterance_time = event.payload.signal.time.end if event.payload.signal.time.end else event.metadata.timestamp
+            logger.debug("Set last utterance to %s", event.payload.signal.text)
+        else:
+            self._active = self._chat_intention_is_active(event)
 
-        if self._is_chat_intention(event):
-            response_payload = self._create_payload()
-            self._event_bus.publish(self._speaker_mention_topic, Event.for_payload(response_payload))
-            logger.debug("Starting to chat with text mention %s", response_payload)
+        if self._active and not self._initialized and self._speaker:
+            self._initialize_chat()
+            self._initialized = True
 
-    def _is_chat_intention(self, event):
-        return (event.metadata.topic == self._intention_topic
-                and hasattr(event.payload, "intentions")
-                and self._intentions in event.payload.intentions)
+    def _chat_intention_is_active(self, event):
+        if event.metadata.topic != self._intention_topic or not hasattr(event.payload, "intentions"):
+            return self._active
+
+        return self._intentions in event.payload.intentions
+
+    def _initialize_chat(self):
+        response_payload = self._create_payload()
+        self._event_bus.publish(self._speaker_mention_topic, Event.for_payload(response_payload))
+        logger.debug("Starting to chat with text mention %s", response_payload)
 
     def _create_payload(self):
         scenario_id = self._emissor_client.get_current_scenario_id()
