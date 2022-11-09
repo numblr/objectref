@@ -9,6 +9,7 @@ from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
 from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.topic_worker import TopicWorker
+from cltl.combot.infra.time_util import timestamp_now
 from cltl.object_recognition.api import Object
 from emissor.representation.scenario import Modality, Scenario, class_type
 
@@ -123,6 +124,7 @@ class ContextService:
         logger.info("Updated scenario %s", self._scenario)
 
     def _stop_scenario(self):
+        self._scenario.ruler.end = timestamp_now()
         self._event_bus.publish(self._scenario_topic,
                                 Event.for_payload(ScenarioStopped.create(self._scenario)))
         logger.info("Stopped scenario %s", self._scenario)
@@ -134,7 +136,7 @@ class ContextService:
             Modality.AUDIO.name.lower(): "./audio.json"
         }
 
-        scenario_start = datetime.today().strftime('%Y-%m-%d')
+        scenario_start = timestamp_now()
         location = self._get_location()
 
         scenario_context = LeolaniContext(AGENT, Agent(), str(uuid.uuid4()), location, [], [])
