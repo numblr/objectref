@@ -56,7 +56,7 @@ class InitializeChatService():
         self._initialized = False
 
     def start(self, timeout=30):
-        topics = [self._scenario_topic, self._intention_topic]
+        topics = [self._scenario_topic, self._intention_topic, self._utterance_topic]
         self._topic_worker = TopicWorker(topics, self._event_bus,
                                          provides=[self._speaker_mention_topic],
                                          resource_manager=self._resource_manager,
@@ -83,7 +83,9 @@ class InitializeChatService():
             logger.debug("Reset chat initialization after %s", time_elapsed)
         elif not event:
             pass
-        elif event.metadata.topic == self._scenario_topic and event.payload.scenario.context.speaker:
+        elif (event.metadata.topic == self._scenario_topic
+                and event.payload.scenario.context.speaker
+                and event.payload.scenario.context.speaker.uri):
             self._speaker = event.payload.scenario.context.speaker
             logger.debug("Set speaker to %s", self._speaker)
         elif event.metadata.topic == self._utterance_topic:
@@ -91,7 +93,7 @@ class InitializeChatService():
             self._last_utterance_time = event.metadata.timestamp
             # TODO ensure timestamps are millisec
             # self._last_utterance_time = event.payload.signal.time.end if event.payload.signal.time.end else event.metadata.timestamp
-            logger.debug("Set last utterance to %s", event.payload.signal.text)
+            logger.debug("Set last utterance to %s (%s)", self._last_utterance, event.payload.signal.text)
         else:
             self._active = self._chat_intention_is_active(event)
 
