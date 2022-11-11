@@ -96,6 +96,7 @@ class InitializeChatService():
             logger.debug("Set last utterance to %s (%s)", self._last_utterance, event.payload.signal.text)
         else:
             self._active = self._chat_intention_is_active(event)
+            self._initialized = self._active and self._initialized
 
         if self._active and not self._initialized and self._speaker:
             self._initialize_chat()
