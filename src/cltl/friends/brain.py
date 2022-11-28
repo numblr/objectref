@@ -41,7 +41,7 @@ class BrainFriendsStore(FriendStore):
                 self._create_speaker_capsule(scenario_id, mention_id, uri, identifier, name),
                 create_label=True)
 
-        return str(uri)
+        return str(uri) if uri is not None else None
 
     def get_friend(self, identifier: str) -> Tuple[str, List[str]]:
         """
@@ -51,7 +51,7 @@ class BrainFriendsStore(FriendStore):
         """
         uri, names = self._search.search_entity_by_face(self._create_uri(identifier))
 
-        return str(uri), names
+        return str(uri) if uri is not None else None, names
 
     def get_friends(self) -> Mapping[str, Tuple[str, List[str]]]:
         face_entries = self._search.search_faces()

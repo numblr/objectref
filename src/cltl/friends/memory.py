@@ -1,13 +1,6 @@
-import itertools
-from pathlib import Path
 from typing import Union, Iterable, List, Tuple, Mapping
 
-from cltl.brain.infrastructure.rdf_builder import RdfBuilder
-from cltl.combot.infra.time_util import timestamp_now
-from cltl.commons.discrete import UtteranceType
-
 from cltl.friends.api import FriendStore
-from cltl.friends.querying import FriendSearch
 
 
 class MemoryFriendsStore(FriendStore):
