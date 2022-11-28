@@ -1,15 +1,14 @@
 import logging
 import uuid
 from collections import Counter
-from datetime import datetime
 
 import requests
 from cltl.combot.event.emissor import LeolaniContext, Agent, ScenarioStarted, ScenarioStopped, ScenarioEvent
 from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
 from cltl.combot.infra.resource import ResourceManager
-from cltl.combot.infra.topic_worker import TopicWorker
 from cltl.combot.infra.time_util import timestamp_now
+from cltl.combot.infra.topic_worker import TopicWorker
 from cltl.object_recognition.api import Object
 from emissor.representation.scenario import Modality, Scenario, class_type
 
