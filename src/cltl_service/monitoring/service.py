@@ -101,6 +101,7 @@ class MonitoringService:
             return Response(json.dumps(self._text_info), mimetype="application/json")
 
         @self._app.route('/image.jpg', methods=['GET'])
+        @no_cache
         def _image():
             if not self._display:
                 return Response(status=HTTPStatus.NOT_FOUND)

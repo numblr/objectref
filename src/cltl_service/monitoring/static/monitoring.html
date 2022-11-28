@@ -14,11 +14,9 @@
 <script>
 
 $(function() {
-    var cnt = 0;
     let $image = $("#image");
     var load_data = function() {
-        cnt += 1;
-        $image.attr("src", "../image.jpg?" + cnt);
+        $image.attr("src", "../image.jpg?" + new Date().getTime());
     };
 
     setInterval(load_data, 2500);
