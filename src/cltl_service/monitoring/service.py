@@ -6,6 +6,7 @@ from http import HTTPStatus
 from typing import Callable
 
 import flask
+import time
 from PIL import Image, ImageDraw, ImageFont
 from cltl.backend.source.client_source import ClientImageSource
 from cltl.backend.spi.image import ImageSource
@@ -13,6 +14,7 @@ from cltl.combot.infra.config import ConfigurationManager
 from cltl.combot.infra.event import Event, EventBus
 from cltl.combot.infra.resource import ResourceManager
 from cltl.combot.infra.topic_worker import TopicWorker
+from cltl.combot.infra.util import ThreadsafeValue
 from cltl.object_recognition.api import Object
 from emissor.representation.scenario import class_type
 from flask import Response
@@ -45,6 +47,8 @@ def no_cache(f):
 
 
 class MonitoringService:
+    ACTIVE_INTERVAL = 15 #sec
+
     @classmethod
     def from_config(cls, friend_store: FriendStore,
                     event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
@@ -85,6 +89,8 @@ class MonitoringService:
         self._image = None
         self._display = None
 
+        self._active = ThreadsafeValue(None)
+
     @property
     def app(self):
         if self._app:
@@ -95,6 +101,8 @@ class MonitoringService:
         @self._app.route('/text', methods=['GET'])
         @no_cache
         def text_info():
+            self._active.value = time.time()
+
             if not self._text_info:
                 return Response(status=HTTPStatus.NOT_FOUND)
 
@@ -103,6 +111,8 @@ class MonitoringService:
         @self._app.route('/image.jpg', methods=['GET'])
         @no_cache
         def _image():
+            self._active.value = time.time()
+
             if not self._display:
                 return Response(status=HTTPStatus.NOT_FOUND)
 
@@ -129,6 +139,15 @@ class MonitoringService:
         self._topic_worker = None
 
     def _process(self, event: Event):
+        if not self._active.value:
+            logger.debug("Skipping event while monitoring is not active")
+            return
+
+        if self._active.value < time.time() - self.ACTIVE_INTERVAL:
+            self._active.value = None
+            logger.info("Deactivate monitoring")
+            return
+
         if event.metadata.topic == self._text_in_topic:
             self._update_text(event, "You")
         elif event.metadata.topic == self._text_out_topic:

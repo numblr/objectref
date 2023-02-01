@@ -14,14 +14,24 @@
 <script>
 
 $(function() {
+    let active = true;
+    $(window).focus(function() {
+         active = true;
+    });
+
+    $(window).blur(function() {
+        active = false;
+    });
+
     let $image = $("#image");
     var load_data = function() {
-        $image.attr("src", "../image.jpg?" + new Date().getTime());
+        if (active) {
+            $image.attr("src", "../image.jpg?" + new Date().getTime());
+        }
     };
 
     setInterval(load_data, 2500);
 });
-
 
 </script>
 </body>
