@@ -14,12 +14,15 @@ from cltl.object_recognition.api import Object
 from cltl_service.emissordata.client import EmissorDataClient
 from emissor.representation.scenario import class_type, TextSignal
 
+from objectref.objectloc.api import ObjectLocationDetector
+
 logger = logging.getLogger(__name__)
 
 
 class ObjectLocationService:
     @classmethod
-    def from_config(cls, emissor_client: EmissorDataClient, event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
+    def from_config(cls, location_detector: ObjectLocationDetector, emissor_client: EmissorDataClient,
+                    event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
         config = config_manager.get_config("objectref.objectloc")
         image_topic = config.get("topic_image")
         object_topic = config.get("topic_object")
@@ -30,15 +33,16 @@ class ObjectLocationService:
             return ClientImageSource.from_config(config_manager, url)
 
         return cls(image_topic, object_topic, text_in_topic, text_out_topic,
-                   image_loader, emissor_client, event_bus, resource_manager)
+                   image_loader, location_detector, emissor_client, event_bus, resource_manager)
 
     def __init__(self, image_topic: str, object_topic: str, text_in_topic: str, text_out_topic: str,
-                 image_loader: Callable[[str], ImageSource],
+                 image_loader: Callable[[str], ImageSource], location_detector: ObjectLocationDetector,
                  emissor_client: EmissorDataClient, event_bus: EventBus, resource_manager: ResourceManager):
         self._emissor_client = emissor_client
         self._event_bus = event_bus
         self._resource_manager = resource_manager
 
+        self._location_detector = location_detector
         self._image_loader = image_loader
 
         self._image_topic = image_topic
@@ -117,6 +121,6 @@ class ObjectLocationService:
 
     def _process_image(self, objects, mentions, image):
         scenario_id = self._emissor_client.get_current_scenario_id()
-        utterance = f"Oh, I see objects: {objects}"
+        utterance = f"Oh, I see objects: {objects} at locations {[self._location_detector.get_location(image, bbox) for _, bbox in objects]}"
         signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None, utterance)
         self._event_bus.publish(self._text_out_topic, Event.for_payload(TextSignalEvent.for_agent(signal)))
