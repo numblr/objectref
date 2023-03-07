@@ -77,6 +77,12 @@ class InitService:
         self._topic_worker = None
 
     def _process(self, event: Event):
+        if self._greeting:
+            self._process_event(event)
+        else:
+            self._event_bus.publish(self._desire_topic, Event.for_payload(DesireEvent(["initialized"])))
+
+    def _process_event(self, event: Event):
         timestamp = timestamp_now()
 
         scheduled_invocation = event is None
