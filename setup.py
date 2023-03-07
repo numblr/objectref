@@ -7,12 +7,11 @@ with open("VERSION", "r") as fh:
     version = fh.read().strip()
 
 setup(
-    name='cltl.leolani',
+    name='objectref',
     version=version,
     package_dir={'': 'src'},
     packages=find_namespace_packages(include=['cltl.*', 'cltl_service.*'], where='src'),
     package_data={
-        'cltl.friends': ['queries/*'],
         "cltl_service.monitoring": ["static/*"]
     },
     data_files=[('VERSION', ['VERSION'])],
@@ -24,7 +23,5 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     python_requires='>=3.7',
-    install_requires=['cltl.combot', 'cltl.emissor-data', 'cltl.backend', 'cltl.object-recognition', 'cltl.face-recognition',
-                      'cltl.brain', 'cltl.triple_extraction', 'cltl.reply_generation',
-                      'emissor', 'jsonpickle', 'pillow', 'flask'],
+    install_requires=['cltl.backend', 'cltl.combot', 'Pillow'],
 )

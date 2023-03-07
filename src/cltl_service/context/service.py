@@ -12,8 +12,6 @@ from cltl.combot.infra.topic_worker import TopicWorker
 from cltl.object_recognition.api import Object
 from emissor.representation.scenario import Modality, Scenario, class_type
 
-from cltl.friends.api import FriendStore
-
 logger = logging.getLogger(__name__)
 
 
@@ -22,26 +20,21 @@ AGENT = Agent("Leolani", "http://cltl.nl/leolani/world/leolani")
 
 class ContextService:
     @classmethod
-    def from_config(cls, friend_store: FriendStore,
-                    event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
+    def from_config(cls, event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
         config = config_manager.get_config("cltl.context")
         scenario_topic = config.get("topic_scenario")
         speaker_topic = config.get("topic_speaker")
         object_topic = config.get("topic_object")
-        vector_id_topic = config.get("topic_vector_id")
-        knowledge_topic = config.get("topic_knowledge")
         intention_topic = config.get("topic_intention")
         desire_topic = config.get("topic_desire")
 
-        return cls(scenario_topic, speaker_topic, knowledge_topic,
-                   object_topic, vector_id_topic,
+        return cls(scenario_topic, speaker_topic, object_topic,
                    intention_topic, desire_topic,
-                   friend_store, event_bus, resource_manager)
+                   event_bus, resource_manager)
 
-    def __init__(self, scenario_topic: str, speaker_topic: str, knowledge_topic: str,
-                 object_topic: str, vector_id_topic: str,
+    def __init__(self, scenario_topic: str, speaker_topic: str, object_topic: str,
                  intention_topic: str, desire_topic: str,
-                 friend_store: FriendStore, event_bus: EventBus, resource_manager: ResourceManager):
+                 event_bus: EventBus, resource_manager: ResourceManager):
         self._event_bus = event_bus
         self._resource_manager = resource_manager
 
@@ -50,13 +43,10 @@ class ContextService:
         self._intention_topic = intention_topic
         self._desire_topic = desire_topic
         self._object_topic = object_topic
-        self._vector_id_topic = vector_id_topic
-        self._knowledge_topic = knowledge_topic
 
         self._topic_worker = None
 
         self.AGENT = AGENT
-        self._friend_store = friend_store
         self._scenario = None
 
     @property
@@ -64,8 +54,7 @@ class ContextService:
         return None
 
     def start(self, timeout=30):
-        self._topic_worker = TopicWorker([self._intention_topic, self._desire_topic, self._speaker_topic,
-                                          self._object_topic, self._vector_id_topic],
+        self._topic_worker = TopicWorker([self._intention_topic, self._desire_topic, self._speaker_topic, self._object_topic],
                                          self._event_bus, provides=[self._intention_topic],
                                          buffer_size=32, processor=self._process,
                                          resource_manager=self._resource_manager,
@@ -95,8 +84,6 @@ class ContextService:
             self._update_scenario_speaker(event)
         elif event.metadata.topic == self._object_topic:
             self._update_scenario_context_objects(event)
-        elif event.metadata.topic == self._vector_id_topic:
-            self._update_scenario_context_people(event)
         else:
             logger.warning("Unhandled event: %s", event)
 
@@ -104,10 +91,10 @@ class ContextService:
         scenario, capsule = self._create_scenario()
         self._event_bus.publish(self._scenario_topic,
                                 Event.for_payload(ScenarioStarted.create(scenario)))
-        self._event_bus.publish(self._knowledge_topic, Event.for_payload([capsule]))
         self._scenario = scenario
         logger.info("Started scenario %s", scenario)
 
+    # TODO needed?
     def _update_scenario_speaker(self, event):
         # TODO multiple mentions
         mention = event.payload.mentions[0]
@@ -115,9 +102,7 @@ class ContextService:
         id_annotation = next(iter(filter(lambda a: a.type == "VectorIdentity", mention.annotations)))
 
         speaker_name = name_annotation.value.text
-        uri = self._friend_store.add_friend(id_annotation.value, speaker_name,
-                                            scenario_id=self._scenario.id, mention_id=mention.id)
-        self._scenario.context.speaker = Agent(speaker_name, str(uri))
+        self._scenario.context.speaker = Agent(speaker_name, None)
 
         self._event_bus.publish(self._scenario_topic, Event.for_payload(ScenarioEvent.create(self._scenario)))
         logger.info("Updated scenario %s", self._scenario)
@@ -153,33 +138,6 @@ class ContextService:
         }
 
         return scenario, capsule
-
-    def _update_scenario_context_people(self, event):
-        added = False
-        # TODO replace "VectorIdentity" with class_type(VectorIdentity)
-        for face_id in [annotation.value
-                        for mention in event.payload.mentions
-                        for annotation in mention.annotations
-                        if annotation.type == "VectorIdentity"]:
-            uri, names = self._friend_store.get_friend(face_id)
-            if names and names[0] and uri:
-                agent = Agent(names[0], uri)
-            elif uri:
-                agent = Agent(uri=uri)
-            elif face_id:
-                agent = Agent(uri=face_id)
-            else:
-                agent = None
-                logger.debug("No person in event %s", event)
-
-            if agent and agent not in self._scenario.context.persons:
-                self._scenario.context.persons.append(agent)
-
-            added = True
-
-        if added:
-            self._event_bus.publish(self._scenario_topic, Event.for_payload(ScenarioEvent.create(self._scenario)))
-            logger.info("Updated scenario with persons %s", self._scenario)
 
     def _update_scenario_context_objects(self, event):
         object_labels = [annotation.value.label

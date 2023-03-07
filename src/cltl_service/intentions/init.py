@@ -33,7 +33,6 @@ class InitService:
             "desire_topic": config.get("topic_desire"),
             "text_in_topic": config.get("topic_text_in"),
             "text_out_topic": config.get("topic_text_out"),
-            "face_topic": config.get("topic_face"),
         }
 
         greeting = config.get("greeting")
@@ -50,7 +49,6 @@ class InitService:
         self._desire_topic = topics["desire_topic"]
         self._text_in_topic = topics["text_in_topic"]
         self._text_out_topic = topics["text_out_topic"]
-        self._face_topic = topics["face_topic"]
         self._greeting = greeting
 
         self._topic_worker = None
@@ -62,7 +60,7 @@ class InitService:
         return None
 
     def start(self, timeout=30):
-        self._topic_worker = TopicWorker(list(filter(bool, [self._face_topic, self._text_in_topic])),
+        self._topic_worker = TopicWorker(list(filter(bool, [self._text_in_topic])),
                                          self._event_bus, provides=[self._text_out_topic],
                                          intentions=["init"], intention_topic=self._intention_topic,
                                          resource_manager=self._resource_manager, processor=self._process,
@@ -82,7 +80,7 @@ class InitService:
         timestamp = timestamp_now()
 
         scheduled_invocation = event is None
-        if (scheduled_invocation or self._face_or_keyword(event)) and not self._timeout:
+        if (scheduled_invocation or self._keyword(event)) and not self._timeout:
             greeting = random.choice(GREETING) + " " + self._greeting
             self._event_bus.publish(self._text_out_topic, Event.for_payload(self._create_text_signal_event(greeting)))
             self._timeout = timestamp
@@ -104,11 +102,7 @@ class InitService:
     def _start_utterance(self, event):
         return event.metadata.topic == self._text_in_topic and "yes" in event.payload.signal.text.lower()
 
-    def _face_or_keyword(self, event):
-        if event.metadata.topic == self._face_topic:
-            return any(annotation.value
-                for mention in event.payload.mentions
-                for annotation in mention.annotations)
+    def _keyword(self, event):
         if event.metadata.topic == self._text_in_topic:
             utterance = re.sub('[^a-z]+', '', event.payload.signal.text.lower())
             return any(greeting in utterance for greeting in _GREETINGS)

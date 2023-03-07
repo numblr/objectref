@@ -1,12 +1,12 @@
 import io
 import json
 import logging
+import time
 from functools import wraps
 from http import HTTPStatus
 from typing import Callable
 
 import flask
-import time
 from PIL import Image, ImageDraw, ImageFont
 from cltl.backend.source.client_source import ClientImageSource
 from cltl.backend.spi.image import ImageSource
@@ -18,8 +18,6 @@ from cltl.combot.infra.util import ThreadsafeValue
 from cltl.object_recognition.api import Object
 from emissor.representation.scenario import class_type
 from flask import Response
-
-from cltl.friends.api import FriendStore
 
 logger = logging.getLogger(__name__)
 
@@ -50,23 +48,21 @@ class MonitoringService:
     ACTIVE_INTERVAL = 15 #sec
 
     @classmethod
-    def from_config(cls, friend_store: FriendStore,
-                    event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
+    def from_config(cls, event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
         config = config_manager.get_config("cltl.monitoring")
         image_topic = config.get("topic_image")
         object_topic = config.get("topic_object")
-        vector_id_topic = config.get("topic_vector_id")
         text_in_topic = config.get("topic_text_in")
         text_out_topic = config.get("topic_text_out")
 
         def image_loader(url) -> ImageSource:
             return ClientImageSource.from_config(config_manager, url)
 
-        return cls(image_topic, object_topic, vector_id_topic, text_in_topic, text_out_topic,
-                   image_loader, friend_store, event_bus, resource_manager)
+        return cls(image_topic, object_topic, text_in_topic, text_out_topic,
+                   image_loader, event_bus, resource_manager)
 
-    def __init__(self, image_topic: str, object_topic: str, vector_id_topic: str, text_in_topic: str, text_out_topic: str,
-                 image_loader: Callable[[str], ImageSource], friend_store: FriendStore,
+    def __init__(self, image_topic: str, object_topic: str, text_in_topic: str, text_out_topic: str,
+                 image_loader: Callable[[str], ImageSource],
                  event_bus: EventBus, resource_manager: ResourceManager):
         self._event_bus = event_bus
         self._resource_manager = resource_manager
@@ -75,13 +71,11 @@ class MonitoringService:
 
         self._image_topic = image_topic
         self._object_topic = object_topic
-        self._vector_id_topic = vector_id_topic
         self._text_in_topic = text_in_topic
         self._text_out_topic = text_out_topic
 
         self._topic_worker = None
 
-        self._friend_store = friend_store
         self._friend_cache = dict()
 
         self._app = None
@@ -123,7 +117,7 @@ class MonitoringService:
         return self._app
 
     def start(self, timeout=30):
-        self._topic_worker = TopicWorker([self._image_topic, self._object_topic, self._vector_id_topic,
+        self._topic_worker = TopicWorker([self._image_topic, self._object_topic,
                                           self._text_in_topic, self._text_out_topic],
                                          self._event_bus, buffer_size=8, processor=self._process,
                                          resource_manager=self._resource_manager,
@@ -156,8 +150,6 @@ class MonitoringService:
             self._update_image(event)
         elif event.metadata.topic == self._object_topic:
             self._update_objects(event)
-        elif event.metadata.topic == self._vector_id_topic:
-            self._update_people(event)
         else:
             logger.warning("Unhandled event: %s", event)
 
@@ -177,19 +169,6 @@ class MonitoringService:
         self._create_display(self._image)
 
         logger.debug("Updated image")
-
-    def _update_people(self, event):
-        items = []
-
-        # TODO replace "VectorIdentity" with class_type(VectorIdentity)
-        for face_id, bounds in [(annotation.value, mention.segment[0].bounds)
-                        for mention in event.payload.mentions
-                        for annotation in mention.annotations
-                        if annotation.type == "VectorIdentity" and mention.segment]:
-            if face_id:
-                items.append((self._get_name(face_id), bounds))
-
-        self._annotate_image(items)
 
     def _get_name(self, face_id):
         if face_id in self._friend_cache:
