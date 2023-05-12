@@ -23,5 +23,18 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     python_requires='>=3.7',
-    install_requires=['cltl.backend', 'cltl.combot', 'Pillow'],
+    install_requires=["cltl.object-recognition"],
+    extras_require={
+        "impl": [
+            "mock",
+            "requests",
+            "parameterized"
+        ],
+        "service": [
+            "cltl.combot",
+            "cltl.emissordata",
+            "cltl.object-recognition",
+            "emissor",
+        ]
+    }
 )

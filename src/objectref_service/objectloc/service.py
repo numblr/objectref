@@ -13,15 +13,14 @@ from cltl.combot.infra.topic_worker import TopicWorker
 from cltl.object_recognition.api import Object
 from cltl_service.emissordata.client import EmissorDataClient
 from emissor.representation.scenario import class_type, TextSignal
-
-from objectref.objectloc.api import ObjectLocationDetector
+from objectref.objectloc.api import ObjectReference
 
 logger = logging.getLogger(__name__)
 
 
-class ObjectLocationService:
+class ObjectReferenceService:
     @classmethod
-    def from_config(cls, location_detector: ObjectLocationDetector, emissor_client: EmissorDataClient,
+    def from_config(cls, object_reference: ObjectReference, emissor_client: EmissorDataClient,
                     event_bus: EventBus, resource_manager: ResourceManager, config_manager: ConfigurationManager):
         config = config_manager.get_config("objectref.objectloc")
         image_topic = config.get("topic_image")
@@ -33,16 +32,16 @@ class ObjectLocationService:
             return ClientImageSource.from_config(config_manager, url)
 
         return cls(image_topic, object_topic, text_in_topic, text_out_topic,
-                   image_loader, location_detector, emissor_client, event_bus, resource_manager)
+                   image_loader, object_reference, emissor_client, event_bus, resource_manager)
 
     def __init__(self, image_topic: str, object_topic: str, text_in_topic: str, text_out_topic: str,
-                 image_loader: Callable[[str], ImageSource], location_detector: ObjectLocationDetector,
+                 image_loader: Callable[[str], ImageSource], object_reference: ObjectReference,
                  emissor_client: EmissorDataClient, event_bus: EventBus, resource_manager: ResourceManager):
         self._emissor_client = emissor_client
         self._event_bus = event_bus
         self._resource_manager = resource_manager
 
-        self._location_detector = location_detector
+        self._object_reference = object_reference
         self._image_loader = image_loader
 
         self._image_topic = image_topic
@@ -51,6 +50,7 @@ class ObjectLocationService:
         self._text_out_topic = text_out_topic
 
         self._image_cache = OrderedDict()
+        self._object_cache = OrderedDict()
 
         self._topic_worker = None
 
@@ -70,37 +70,41 @@ class ObjectLocationService:
         self._topic_worker = None
 
     def _process(self, event: Event):
+        image_id = None
         if event.metadata.topic == self._text_in_topic:
-            pass
+            self._process_text(event.payload.signal.text)
         elif event.metadata.topic == self._image_topic:
-            self._update_image(event)
+            image_id = self._update_image(event)
         elif event.metadata.topic == self._object_topic:
-            self._update_objects(event)
+            image_id = self._update_objects(event)
         else:
             logger.warning("Unhandled event: %s", event)
 
-    def _update_text(self, event, speaker):
-        self._text_info = {
-            "utterance": event.payload.signal.text,
-            "speaker": speaker
-        }
+        if image_id and image_id in self._image_cache and image_id in self._object_cache:
+            self._process_image(image_id)
+
+    def _process_text(self, utterance):
+        # TODO process text and create an answer
+
+        scenario_id = self._emissor_client.get_current_scenario_id()
+        utterance = f"You said: {utterance}"
+        signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None, utterance)
+        self._event_bus.publish(self._text_out_topic, Event.for_payload(TextSignalEvent.for_agent(signal)))
 
     def _update_image(self, event):
         if len(self._image_cache) > 5:
             self._image_cache.popitem(last=False)
 
-        self._image_cache[event.payload.signal.id] = event.payload.signal.files[0]
+        image_id = event.payload.signal.id
+        self._image_cache[image_id] = event.payload.signal.files[0]
 
         logger.debug("Updated image")
 
-    def _update_objects(self, event):
-        objects = [(annotation.value.label, mention.segment[0].bounds)
-                   for mention in event.payload.mentions
-                   for annotation in mention.annotations
-                   if annotation.type == class_type(Object) and annotation.value and mention.segment]
+        return image_id
 
-        if not objects:
-            return
+    def _update_objects(self, event):
+        if len(self._object_cache) > 5:
+            self._object_cache.popitem(last=False)
 
         # All segments should be in the same image, therefore we just take the first
         image_id = next((mention.segment[0].container_id
@@ -108,19 +112,27 @@ class ObjectLocationService:
                     for annotation in mention.annotations
                     if annotation.type == class_type(Object) and annotation.value and mention.segment), None)
 
-        if not image_id or image_id not in self._image_cache:
-            return
+        self._object_cache[image_id] =  [(annotation.value.label, mention.segment[0].bounds)
+                   for mention in event.payload.mentions
+                   for annotation in mention.annotations
+                   if annotation.type == class_type(Object) and annotation.value and mention.segment]
 
+        logger.debug("Updated image")
+
+        return image_id
+
+    def _process_image(self, image_id):
         image_location = self._image_cache[image_id]
         with self._image_loader(image_location) as source:
             image = source.capture()
 
             logger.debug("Image for objects with bounds %s", image.bounds)
 
-        self._process_image(objects, event.payload.mentions, image)
+        objects = self._object_cache[image_id]
 
-    def _process_image(self, objects, mentions, image):
+        # TODO Resolve locations and store objects
+
         scenario_id = self._emissor_client.get_current_scenario_id()
-        utterance = f"Oh, I see objects: {objects} at locations {[self._location_detector.get_location(image, bbox) for _, bbox in objects]}"
+        utterance = f"Oh, I see objects: {objects} at locations {[self._object_reference.get_location(image, bbox) for _, bbox in objects]}"
         signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None, utterance)
         self._event_bus.publish(self._text_out_topic, Event.for_payload(TextSignalEvent.for_agent(signal)))
