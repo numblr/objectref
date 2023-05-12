@@ -84,11 +84,11 @@ class ObjectReferenceService:
             self._process_image(image_id)
 
     def _process_text(self, utterance):
-        # TODO process text and create an answer
+        # TODO process text and create a reply
+        reply = self._object_reference.process_utterance(utterance)
 
         scenario_id = self._emissor_client.get_current_scenario_id()
-        utterance = f"You said: {utterance}"
-        signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None, utterance)
+        signal = TextSignal.for_scenario(scenario_id, timestamp_now(), timestamp_now(), None, reply)
         self._event_bus.publish(self._text_out_topic, Event.for_payload(TextSignalEvent.for_agent(signal)))
 
     def _update_image(self, event):
@@ -125,12 +125,12 @@ class ObjectReferenceService:
         image_location = self._image_cache[image_id]
         with self._image_loader(image_location) as source:
             image = source.capture()
-
-            logger.debug("Image for objects with bounds %s", image.bounds)
+            logger.debug("Loaded image for objects with bounds %s", image.bounds)
 
         objects = self._object_cache[image_id]
 
         # TODO Resolve locations and store objects
+        self._object_reference.add_observation(image, objects)
 
         scenario_id = self._emissor_client.get_current_scenario_id()
         utterance = f"Oh, I see objects: {objects} at locations {[self._object_reference.get_location(image, bbox) for _, bbox in objects]}"
